@@ -1,3 +1,12 @@
+packages:
+  - .
+
+# pnpm >= 11
 allowBuilds:
   workerd: true
   esbuild: true
+
+# pnpm 10 fallback (ignored by pnpm 11)
+onlyBuiltDependencies:
+  - workerd
+  - esbuild
