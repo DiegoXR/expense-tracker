@@ -16,10 +16,17 @@ worker-configuration.d.ts
 Thumbs.db
 
 # Env
+# .env holds credentials for Node tooling (drizzle-kit).
 .env
 .env.*
 !.env.example
 !.env.test
+
+# .dev.vars holds Worker runtime secrets for local development — the local
+# stand-in for `wrangler secret put`. Never commit it.
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
 
 # Vite
 vite.config.js.timestamp-*
