@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	assertBalancesSumToZero,
 	computeBalanceDeltas,
+	computeMemberLedger,
 	mergeBalances,
 	type MemberBalance
 } from './balance';
@@ -19,30 +20,30 @@ const USD: CurrencyMeta = {
 	allowDecimals: true
 };
 
-const viewer: MemberSummary = {
+const alex: MemberSummary = {
 	id: 'gm-alex',
 	groupId: 'g',
 	person: { id: 'p-alex', name: 'Alex', avatarColor: 'indigo', isSelf: true }
 };
-const other: MemberSummary = {
+const sam: MemberSummary = {
 	id: 'gm-sam',
 	groupId: 'g',
 	person: { id: 'p-sam', name: 'Sam', avatarColor: 'rose', isSelf: false }
 };
-const members = [viewer, other];
+const members = [alex, sam];
 
-/** The worked example from the docs: the viewer pays 100.00, split 60/40. */
+/** The worked example from the docs: Alex pays 100.00, split 60/40. */
 const dinner: ExpenseView = {
 	id: 'e1',
 	description: 'Dinner',
 	notes: null,
 	totalMinor: 10_000,
 	expenseDate: '2026-08-28',
-	payerMemberId: viewer.id,
+	payerMemberId: alex.id,
 	category: null,
 	splits: buildSplits(10_000, [
-		{ memberId: viewer.id, sharePct: 60 },
-		{ memberId: other.id, sharePct: 40 }
+		{ memberId: alex.id, sharePct: 60 },
+		{ memberId: sam.id, sharePct: 40 }
 	])
 };
 
@@ -75,8 +76,8 @@ describe('balances', () => {
 	it('matches the worked example: payer +$40.00, other -$40.00', () => {
 		const balances = mergeBalances(members, computeBalanceDeltas([dinner], []));
 		expect(balances).toEqual([
-			{ memberId: viewer.id, person: viewer.person, balanceMinor: 4000 },
-			{ memberId: other.id, person: other.person, balanceMinor: -4000 }
+			{ memberId: alex.id, person: alex.person, balanceMinor: 4000 },
+			{ memberId: sam.id, person: sam.person, balanceMinor: -4000 }
 		]);
 	});
 
@@ -88,8 +89,8 @@ describe('balances', () => {
 				[
 					{
 						id: 's1',
-						fromMemberId: other.id,
-						toMemberId: viewer.id,
+						fromMemberId: sam.id,
+						toMemberId: alex.id,
 						amountMinor: 4000,
 						settledDate: '2026-08-29',
 						note: null
@@ -126,6 +127,46 @@ describe('balances', () => {
 	});
 });
 
+describe('computeMemberLedger', () => {
+	const settlement = {
+		id: 's1',
+		fromMemberId: sam.id,
+		toMemberId: alex.id,
+		amountMinor: 2000,
+		settledDate: '2026-08-29',
+		note: null
+	};
+
+	it('breaks the balance into terms that reconcile', () => {
+		const ledger = computeMemberLedger(alex.id, [dinner], [settlement]);
+		expect(ledger.paidMinor).toBe(10_000);
+		expect(ledger.shareMinor).toBe(6000);
+		expect(ledger.settlementsSentMinor).toBe(0);
+		expect(ledger.settlementsReceivedMinor).toBe(2000);
+		expect(ledger.balanceMinor).toBe(2000);
+	});
+
+	it('agrees with the balance the group screen shows', () => {
+		// The breakdown panel must never contradict the figure beside it.
+		for (const group of mockGroups) {
+			const expenses = mockExpensesByGroup[group.id] ?? [];
+			const settlements = mockSettlementsByGroup[group.id] ?? [];
+			const balances = mergeBalances(group.members, computeBalanceDeltas(expenses, settlements));
+
+			for (const balance of balances) {
+				const ledger = computeMemberLedger(balance.memberId, expenses, settlements);
+				expect(ledger.balanceMinor).toBe(balance.balanceMinor);
+				expect(
+					ledger.paidMinor -
+						ledger.shareMinor +
+						ledger.settlementsSentMinor -
+						ledger.settlementsReceivedMinor
+				).toBe(balance.balanceMinor);
+			}
+		}
+	});
+});
+
 describe('simplifyDebts', () => {
 	const balanceOf = (memberId: string, balanceMinor: number): MemberBalance => ({
 		memberId,
@@ -134,10 +175,8 @@ describe('simplifyDebts', () => {
 	});
 
 	it('settles the worked example in one transfer', () => {
-		const transfers = simplifyDebts([balanceOf(viewer.id, 4000), balanceOf(other.id, -4000)]);
-		expect(transfers).toEqual([
-			{ fromMemberId: other.id, toMemberId: viewer.id, amountMinor: 4000 }
-		]);
+		const transfers = simplifyDebts([balanceOf(alex.id, 4000), balanceOf(sam.id, -4000)]);
+		expect(transfers).toEqual([{ fromMemberId: sam.id, toMemberId: alex.id, amountMinor: 4000 }]);
 	});
 
 	it('clears every balance and needs at most n-1 transfers', () => {
@@ -169,38 +208,36 @@ describe('simplifyDebts', () => {
 });
 
 describe('wording', () => {
-	it('describes the expense from the viewer point of view', () => {
+	it('names the payer rather than addressing a viewer', () => {
+		// There is no session, so there is nobody for "you" to mean.
 		const { title, detail } = describeExpense(dinner, members, USD);
-		expect(title).toBe('You paid $100.00 for Dinner.');
-		expect(detail).toBe('You lent $40.00 and Sam owes $40.00.');
+		expect(title).toBe('Alex paid $100.00 for Dinner.');
+		expect(detail).toBe('Alex lent $40.00 and Sam owes $40.00.');
 	});
 
-	it('switches to third person when someone else paid', () => {
-		const paidByOther: ExpenseView = { ...dinner, payerMemberId: other.id };
-		const { title, detail } = describeExpense(paidByOther, members, USD);
+	it('reads the same way whoever paid', () => {
+		const paidBySam: ExpenseView = { ...dinner, payerMemberId: sam.id };
+		const { title, detail } = describeExpense(paidBySam, members, USD);
 		expect(title).toBe('Sam paid $100.00 for Dinner.');
-		expect(detail).toBe('Sam lent $60.00 and you owe $60.00.');
+		expect(detail).toBe('Sam lent $60.00 and Alex owes $60.00.');
 	});
 
 	it('says so when the payer covered the whole thing', () => {
 		const solo: ExpenseView = {
 			...dinner,
-			splits: buildSplits(10_000, [{ memberId: viewer.id, sharePct: 100 }])
+			splits: buildSplits(10_000, [{ memberId: alex.id, sharePct: 100 }])
 		};
-		expect(describeExpense(solo, members, USD).detail).toBe('You covered this one yourself.');
+		expect(describeExpense(solo, members, USD).detail).toBe('Alex covered this one alone.');
 	});
 
-	it('captions balances by sign and by who is looking', () => {
-		expect(
-			describeBalance({ memberId: viewer.id, person: viewer.person, balanceMinor: 4000 })
-		).toBe('You are owed');
-		expect(describeBalance({ memberId: viewer.id, person: viewer.person, balanceMinor: -1 })).toBe(
-			'You owe'
+	it('captions balances by sign, leaving the name to the row beside it', () => {
+		expect(describeBalance({ memberId: alex.id, person: alex.person, balanceMinor: 4000 })).toBe(
+			'Is owed'
 		);
-		expect(describeBalance({ memberId: other.id, person: other.person, balanceMinor: -4000 })).toBe(
-			'Sam owes'
+		expect(describeBalance({ memberId: alex.id, person: alex.person, balanceMinor: -1 })).toBe(
+			'Owes'
 		);
-		expect(describeBalance({ memberId: viewer.id, person: viewer.person, balanceMinor: 0 })).toBe(
+		expect(describeBalance({ memberId: sam.id, person: sam.person, balanceMinor: 0 })).toBe(
 			'Settled up'
 		);
 	});
@@ -208,10 +245,10 @@ describe('wording', () => {
 	it('describes a suggested transfer', () => {
 		expect(
 			describeTransfer(
-				{ fromMemberId: other.id, toMemberId: viewer.id, amountMinor: 4000 },
+				{ fromMemberId: sam.id, toMemberId: alex.id, amountMinor: 4000 },
 				members,
 				USD
 			)
-		).toBe('Sam pays you $40.00');
+		).toBe('Sam pays Alex $40.00');
 	});
 });

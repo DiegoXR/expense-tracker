@@ -1,6 +1,9 @@
 /**
- * Every user-facing sentence the ledger produces, in one place. Second person for
- * whoever is marked `isSelf`, third person for everyone else.
+ * Every user-facing sentence the ledger produces, in one place.
+ *
+ * Always third person, never "you". The whole app sits behind one shared
+ * password with no per-user session, so there is nobody for "you" to refer to —
+ * every reader sees the same ledger and every member is named.
  */
 
 import type { MemberBalance } from './balance';
@@ -15,25 +18,19 @@ function joinClauses(clauses: string[]): string {
 	return `${clauses.slice(0, -1).join(', ')} and ${clauses[clauses.length - 1]}`;
 }
 
-function capitalizeFirst(sentence: string): string {
-	return sentence.charAt(0).toUpperCase() + sentence.slice(1);
-}
-
-/** "you" for the viewer, otherwise the person's name. */
 function nameOf(member: MemberSummary | undefined): string {
-	if (!member) return 'someone';
-	return member.person.isSelf ? 'you' : member.person.name;
+	return member?.person.name ?? 'Someone';
 }
 
 export type ExpenseDescription = {
-	/** "Sam paid $100.00 for Dinner." */
+	/** "Alex paid $100.00 for Dinner." */
 	title: string;
-	/** "You lent $40.00 and Sam owes $40.00." Empty when nobody owes anything. */
+	/** "Alex lent $40.00 and Sam owes $40.00." Empty when nobody owes anything. */
 	detail: string;
 };
 
 /**
- * Describes one expense from the viewer's point of view.
+ * Describes one expense: who paid, who lent, and who owes.
  * Derived from the stored amounts, so the sentence always matches the balances.
  */
 export function describeExpense(
@@ -43,23 +40,15 @@ export function describeExpense(
 ): ExpenseDescription {
 	const byId = new Map(members.map((member) => [member.id, member]));
 	const payer = byId.get(expense.payerMemberId);
-	const payerIsViewer = payer?.person.isSelf ?? false;
 
-	const title = capitalizeFirst(
-		`${nameOf(payer)} paid ${formatMinor(expense.totalMinor, currency)} for ${expense.description}.`
-	);
+	const title = `${nameOf(payer)} paid ${formatMinor(expense.totalMinor, currency)} for ${expense.description}.`;
 
 	const payerShare =
 		expense.splits.find((split) => split.memberId === expense.payerMemberId)?.shareMinor ?? 0;
 	const lentMinor = expense.totalMinor - payerShare;
 
 	if (lentMinor <= 0) {
-		return {
-			title,
-			detail: payerIsViewer
-				? 'You covered this one yourself.'
-				: `${payer?.person.name ?? 'They'} covered this one alone.`
-		};
+		return { title, detail: `${nameOf(payer)} covered this one alone.` };
 	}
 
 	const clauses = [`${nameOf(payer)} lent ${formatMinor(lentMinor, currency)}`];
@@ -67,11 +56,10 @@ export function describeExpense(
 	for (const split of expense.splits) {
 		if (split.memberId === expense.payerMemberId || split.shareMinor <= 0) continue;
 		const debtor = byId.get(split.memberId);
-		const verb = debtor?.person.isSelf ? 'owe' : 'owes';
-		clauses.push(`${nameOf(debtor)} ${verb} ${formatMinor(split.shareMinor, currency)}`);
+		clauses.push(`${nameOf(debtor)} owes ${formatMinor(split.shareMinor, currency)}`);
 	}
 
-	return { title, detail: `${capitalizeFirst(joinClauses(clauses))}.` };
+	return { title, detail: `${joinClauses(clauses)}.` };
 }
 
 export type BalanceStatus = 'owed' | 'owes' | 'settled';
@@ -82,30 +70,27 @@ export function balanceStatus(balanceMinor: number): BalanceStatus {
 	return 'settled';
 }
 
-/** The caption under a balance figure: "You are owed", "Sam owes", "Settled up". */
+/**
+ * The caption under a balance figure. Deliberately omits the name, because it
+ * is always rendered next to one — repeating it reads like a stutter.
+ */
 export function describeBalance(balance: MemberBalance): string {
-	const isSelf = balance.person.isSelf;
 	switch (balanceStatus(balance.balanceMinor)) {
 		case 'owed':
-			return isSelf ? 'You are owed' : `${balance.person.name} is owed`;
+			return 'Is owed';
 		case 'owes':
-			return isSelf ? 'You owe' : `${balance.person.name} owes`;
+			return 'Owes';
 		case 'settled':
 			return 'Settled up';
 	}
 }
 
-/** One suggested transfer: "Sam pays you $40.00". */
+/** One suggested transfer: "Sam pays Alex $40.00". */
 export function describeTransfer(
 	transfer: Transfer,
 	members: MemberSummary[],
 	currency: CurrencyMeta
 ): string {
 	const byId = new Map(members.map((member) => [member.id, member]));
-	const from = byId.get(transfer.fromMemberId);
-	const to = byId.get(transfer.toMemberId);
-	const verb = from?.person.isSelf ? 'pay' : 'pays';
-	return capitalizeFirst(
-		`${nameOf(from)} ${verb} ${nameOf(to)} ${formatMinor(transfer.amountMinor, currency)}`
-	);
+	return `${nameOf(byId.get(transfer.fromMemberId))} pays ${nameOf(byId.get(transfer.toMemberId))} ${formatMinor(transfer.amountMinor, currency)}`;
 }

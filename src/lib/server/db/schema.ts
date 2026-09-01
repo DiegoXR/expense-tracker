@@ -87,8 +87,8 @@ export const people = sqliteTable(
 		id: pk(),
 		name: text('name').notNull(),
 		/**
-		 * Exactly one person is "me", enforced by the partial unique index below.
-		 * Drives second-person wording ("You paid" vs "Sam paid").
+		 * At most one person is "me", enforced by the partial unique index below.
+		 * Only preselects the payer on a new expense — the UI never addresses a viewer.
 		 */
 		isSelf: integer('is_self', { mode: 'boolean' }).notNull().default(false),
 		/** Tailwind color token used for the avatar, e.g. 'emerald'. */

@@ -12,18 +12,25 @@
 	import MoneyInput from '$lib/components/MoneyInput.svelte';
 	import PercentageSplitEditor from '$lib/components/PercentageSplitEditor.svelte';
 	import Row from '$lib/components/Row.svelte';
-	import SettlementSuggestion from '$lib/components/SettlementSuggestion.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { computeBalanceDeltas, mergeBalances } from '$lib/domain/balance';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+	import SettingsIcon from '@lucide/svelte/icons/settings';
+	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
+	import UsersIcon from '@lucide/svelte/icons/users';
+	import {
+		computeBalanceDeltas,
+		computeMemberLedger,
+		mergeBalances,
+		type MemberBalance
+	} from '$lib/domain/balance';
 	import {
 		mockCategories,
 		mockExpensesByGroup,
 		mockGroup,
 		mockSettlementsByGroup
 	} from '$lib/domain/mock';
-	import { simplifyDebts } from '$lib/domain/settle';
 	import type { ExpenseView } from '$lib/domain/types';
-	import { describeExpense } from '$lib/domain/wording';
+	import { describeBalance, describeExpense } from '$lib/domain/wording';
 
 	// Phase 1b: mock data, read straight from the route param. Phase 3 swaps this
 	// for a load function; every component below already takes props.
@@ -34,16 +41,22 @@
 	const balances = $derived(
 		mergeBalances(group.members, computeBalanceDeltas(expenses, settlements))
 	);
-	const transfers = $derived(simplifyDebts(balances));
 	const totalMinor = $derived(expenses.reduce((sum, expense) => sum + expense.totalMinor, 0));
 
-	type DrawerName = 'expense' | 'detail' | 'payment' | 'members' | 'settings';
+	type DrawerName = 'expense' | 'detail' | 'balance' | 'payment' | 'members' | 'settings';
 	let drawer = $state<DrawerName | null>(null);
 	let selected = $state<ExpenseView | null>(null);
+	let inspected = $state<MemberBalance | null>(null);
+
+	/** The four terms behind the balance shown beside the member's name. */
+	const ledger = $derived(
+		inspected ? computeMemberLedger(inspected.memberId, expenses, settlements) : null
+	);
 
 	// New-expense form state. It lives here, in the page: domain/ owns the
 	// calculations, the component owns what is happening right now.
 	let draftTotalMinor = $state(0);
+	let draftPayerMemberId = $state('');
 	let draftDate = $state(new Date().toISOString().slice(0, 10));
 	let draftShares = $state<Record<string, number>>({});
 
@@ -58,12 +71,27 @@
 			])
 		);
 		draftTotalMinor = 0;
+		// The one job `people.is_self` has: the person keeping the ledger enters
+		// most of the expenses, so start the payer on them. The UI still names
+		// everyone in the third person — this is a default, not a viewpoint.
+		draftPayerMemberId =
+			group.members.find((member) => member.person.isSelf)?.id ?? group.members[0]?.id ?? '';
 		drawer = 'expense';
+	}
+
+	/** See the overview page: let the menu close before the sheet takes focus. */
+	function openFromMenu(name: DrawerName) {
+		setTimeout(() => (drawer = name));
 	}
 
 	function openDetail(expense: ExpenseView) {
 		selected = expense;
 		drawer = 'detail';
+	}
+
+	function openBalance(balance: MemberBalance) {
+		inspected = balance;
+		drawer = 'balance';
 	}
 </script>
 
@@ -74,14 +102,42 @@
 	subtitle={group.description ?? undefined}
 >
 	{#snippet action()}
-		<Button size="sm" onclick={openExpense}>Add</Button>
+		<DropdownMenu.Root>
+			<DropdownMenu.Trigger>
+				{#snippet child({ props })}
+					<Button {...props} variant="ghost" size="icon" aria-label="Group settings">
+						<SettingsIcon class="size-5" />
+					</Button>
+				{/snippet}
+			</DropdownMenu.Trigger>
+			<DropdownMenu.Content align="end" class="w-48 bg-surface">
+				<DropdownMenu.Item onSelect={() => openFromMenu('settings')}>
+					<SlidersHorizontalIcon class="size-4 text-subtle" />
+					Group
+				</DropdownMenu.Item>
+				<DropdownMenu.Item onSelect={() => openFromMenu('members')}>
+					<UsersIcon class="size-4 text-subtle" />
+					Members
+				</DropdownMenu.Item>
+			</DropdownMenu.Content>
+		</DropdownMenu.Root>
 	{/snippet}
 </BackHeader>
 
-<Card title="Balances" footnote="Balances in a group always add up to zero.">
+<Card title="Balances" footnote="Balances in a group always add up to zero." dividers={false}>
+	<Row label="Spent in total" chevron={false} reserveChevron>
+		{#snippet trailing()}
+			<CurrencyText
+				minor={totalMinor}
+				currency={group.currency}
+				class="text-[17px] font-semibold text-ink"
+			/>
+		{/snippet}
+	</Row>
+
 	{#each balances as balance (balance.memberId)}
 		{@const member = group.members.find((candidate) => candidate.id === balance.memberId)}
-		<Row label={member?.person.name ?? 'Unknown'} chevron={false}>
+		<Row label={member?.person.name ?? 'Unknown'} onclick={() => openBalance(balance)}>
 			{#snippet leading()}
 				{#if member}
 					<MemberAvatar person={member.person} />
@@ -94,34 +150,101 @@
 	{/each}
 </Card>
 
-{#if transfers.length > 0}
-	<Card title="Settle up" footnote="Suggestions only — nothing is recorded until you confirm.">
-		{#each transfers as transfer (transfer.fromMemberId + transfer.toMemberId)}
-			<SettlementSuggestion
-				{transfer}
-				members={group.members}
-				currency={group.currency}
-				onrecord={() => (drawer = 'payment')}
-			/>
-		{/each}
-	</Card>
-{/if}
+<!--
+	Settle-up suggestions are parked until that flow is designed. `simplifyDebts`
+	stays in domain/ with its tests; this was the only place that rendered it.
+
+<Card title="Settle up" footnote="Suggestions only — nothing is recorded until you confirm.">
+	{#each simplifyDebts(balances) as transfer (transfer.fromMemberId + transfer.toMemberId)}
+		<SettlementSuggestion
+			{transfer}
+			members={group.members}
+			currency={group.currency}
+			onrecord={() => (drawer = 'payment')}
+		/>
+	{/each}
+</Card>
+-->
 
 <ExpenseList {expenses} members={group.members} currency={group.currency} onselect={openDetail} />
-
-<Card title="Group">
-	<Row label="Members" value={String(group.members.length)} onclick={() => (drawer = 'members')} />
-	<Row label="Total spend" chevron={false}>
-		{#snippet trailing()}
-			<CurrencyText minor={totalMinor} currency={group.currency} class="text-[15px] text-subtle" />
-		{/snippet}
-	</Row>
-	<Row label="Group settings" onclick={() => (drawer = 'settings')} />
-</Card>
 
 <div class="px-4 pb-6">
 	<Button class="min-h-12 w-full" onclick={openExpense}>Add expense</Button>
 </div>
+
+<Drawer
+	open={drawer === 'balance'}
+	onclose={() => (drawer = null)}
+	title={inspected?.person.name ?? 'Balance'}
+	description="How this balance is made up."
+>
+	{#if ledger && inspected}
+		<!--
+			Every term of the formula, so the figure beside the member's name is
+			arithmetic the user can follow rather than a number they must trust.
+		-->
+		<div class="card overflow-hidden rounded-card bg-surface">
+			<Row label="Paid" sublabel="Expenses this member covered" chevron={false}>
+				{#snippet trailing()}
+					<CurrencyText
+						minor={ledger.paidMinor}
+						currency={group.currency}
+						signed
+						class="text-[17px] text-ink"
+					/>
+				{/snippet}
+			</Row>
+
+			<Row label="Share of expenses" sublabel="What they consumed" chevron={false}>
+				{#snippet trailing()}
+					<CurrencyText
+						minor={-ledger.shareMinor}
+						currency={group.currency}
+						signed
+						class="text-[17px] text-ink"
+					/>
+				{/snippet}
+			</Row>
+
+			{#if ledger.settlementsSentMinor > 0}
+				<Row label="Payments sent" chevron={false}>
+					{#snippet trailing()}
+						<CurrencyText
+							minor={ledger.settlementsSentMinor}
+							currency={group.currency}
+							signed
+							class="text-[17px] text-ink"
+						/>
+					{/snippet}
+				</Row>
+			{/if}
+
+			{#if ledger.settlementsReceivedMinor > 0}
+				<Row label="Payments received" chevron={false}>
+					{#snippet trailing()}
+						<CurrencyText
+							minor={-ledger.settlementsReceivedMinor}
+							currency={group.currency}
+							signed
+							class="text-[17px] text-ink"
+						/>
+					{/snippet}
+				</Row>
+			{/if}
+
+			<Row label="Balance" sublabel={describeBalance(inspected)} chevron={false}>
+				{#snippet trailing()}
+					<CurrencyText
+						minor={ledger.balanceMinor}
+						currency={group.currency}
+						signed={ledger.balanceMinor !== 0}
+						class="text-[17px] font-semibold text-ink"
+					/>
+				{/snippet}
+			</Row>
+		</div>
+	{/if}
+</Drawer>
 
 <Drawer
 	open={drawer === 'expense'}
@@ -153,6 +276,7 @@
 			<select
 				id="expense-payer"
 				name="payerMemberId"
+				bind:value={draftPayerMemberId}
 				class="mt-1 min-h-11 w-full rounded-md border border-chrome px-3 text-[17px] outline-none focus:border-ink"
 			>
 				{#each group.members as member (member.id)}
@@ -244,11 +368,7 @@
 <Drawer open={drawer === 'members'} onclose={() => (drawer = null)} title="Members">
 	<div class="card overflow-hidden rounded-card bg-surface">
 		{#each group.members as member (member.id)}
-			<Row
-				label={member.person.name}
-				value={member.person.isSelf ? 'You' : undefined}
-				chevron={false}
-			>
+			<Row label={member.person.name} chevron={false}>
 				{#snippet leading()}
 					<MemberAvatar person={member.person} />
 				{/snippet}

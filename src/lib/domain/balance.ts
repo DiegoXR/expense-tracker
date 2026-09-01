@@ -48,6 +48,58 @@ export function computeBalanceDeltas(
 	return [...totals].map(([memberId, balanceMinor]) => ({ memberId, balanceMinor }));
 }
 
+/** One member's balance, broken into the four terms of the formula. */
+export type MemberLedger = {
+	memberId: string;
+	/** Expenses this member paid for. */
+	paidMinor: number;
+	/** What they consumed across every expense. */
+	shareMinor: number;
+	/** Settlements they handed to someone else. */
+	settlementsSentMinor: number;
+	/** Settlements someone handed to them. */
+	settlementsReceivedMinor: number;
+	/** paid − share + sent − received. */
+	balanceMinor: number;
+};
+
+/**
+ * Shows the working behind one member's balance, for the breakdown panel.
+ * Omitting the settlement terms would make the figures fail to reconcile.
+ */
+export function computeMemberLedger(
+	memberId: string,
+	expenses: ExpenseView[],
+	settlements: SettlementView[]
+): MemberLedger {
+	let paidMinor = 0;
+	let shareMinor = 0;
+
+	for (const expense of expenses) {
+		if (expense.payerMemberId === memberId) paidMinor += expense.totalMinor;
+		for (const split of expense.splits) {
+			if (split.memberId === memberId) shareMinor += split.shareMinor;
+		}
+	}
+
+	let settlementsSentMinor = 0;
+	let settlementsReceivedMinor = 0;
+
+	for (const settlement of settlements) {
+		if (settlement.fromMemberId === memberId) settlementsSentMinor += settlement.amountMinor;
+		if (settlement.toMemberId === memberId) settlementsReceivedMinor += settlement.amountMinor;
+	}
+
+	return {
+		memberId,
+		paidMinor,
+		shareMinor,
+		settlementsSentMinor,
+		settlementsReceivedMinor,
+		balanceMinor: paidMinor - shareMinor + settlementsSentMinor - settlementsReceivedMinor
+	};
+}
+
 /**
  * Applies query deltas onto the full member list.
  * Members with no activity still appear at zero, which is why we seed from the roster.

@@ -1,130 +1,105 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import Card from '$lib/components/Card.svelte';
 	import CurrencyText from '$lib/components/CurrencyText.svelte';
 	import Drawer from '$lib/components/Drawer.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import MemberAvatar from '$lib/components/MemberAvatar.svelte';
-	import MemberAvatarGroup from '$lib/components/MemberAvatarGroup.svelte';
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import Row from '$lib/components/Row.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { resolve } from '$app/paths';
-	import { computeBalanceDeltas, mergeBalances } from '$lib/domain/balance';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import {
 		mockCategories,
 		mockCurrencies,
 		mockExpensesByGroup,
 		mockGroups,
-		mockPeople,
-		mockSettlementsByGroup
+		mockPeople
 	} from '$lib/domain/mock';
-	import { describeBalance } from '$lib/domain/wording';
-	import type { GroupView } from '$lib/domain/types';
+	import SettingsIcon from '@lucide/svelte/icons/settings';
+	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
+	import TagIcon from '@lucide/svelte/icons/tag';
+	import UsersIcon from '@lucide/svelte/icons/users';
 
 	// Phase 1b: mock data only. Phase 2 replaces this with a load function and
 	// the components below do not change — they already take everything as props.
-	const groups = mockGroups;
+	//
+	// This page is read-only for groups: it shows what each one has cost and
+	// nothing else. Balances belong to a group, so they live on the group page.
+	const cards = mockGroups.map((group) => ({
+		group,
+		totalMinor: (mockExpensesByGroup[group.id] ?? []).reduce(
+			(sum, expense) => sum + expense.totalMinor,
+			0
+		)
+	}));
 
-	type GroupCard = {
-		group: GroupView;
-		totalMinor: number;
-		selfBalanceMinor: number;
-		selfCaption: string;
-	};
+	type DrawerName = 'group' | 'people' | 'categories' | 'settings';
+	let drawer = $state<DrawerName | null>(null);
 
-	const cards: GroupCard[] = groups.map((group) => {
-		const expenses = mockExpensesByGroup[group.id] ?? [];
-		const balances = mergeBalances(
-			group.members,
-			computeBalanceDeltas(expenses, mockSettlementsByGroup[group.id] ?? [])
-		);
-		const self = balances.find((balance) => balance.person.isSelf);
-		return {
-			group,
-			totalMinor: expenses.reduce((sum, expense) => sum + expense.totalMinor, 0),
-			selfBalanceMinor: self?.balanceMinor ?? 0,
-			selfCaption: self ? describeBalance(self) : 'Not a member'
-		};
-	});
-
-	// Never summed across currencies: there are no exchange rates in this app.
-	const totalsByCurrency = $derived.by(() => {
-		const byCode: Record<string, number> = {};
-		for (const card of cards) {
-			const code = card.group.currency.code;
-			byCode[code] = (byCode[code] ?? 0) + card.selfBalanceMinor;
-		}
-		return Object.entries(byCode).map(([code, minor]) => ({
-			currency: Object.values(mockCurrencies).find((meta) => meta.code === code)!,
-			minor
-		}));
-	});
-
-	let drawer = $state<'group' | 'people' | 'categories' | 'settings' | null>(null);
+	/**
+	 * Opens a drawer from the dropdown, one tick late.
+	 *
+	 * The menu restores focus to its trigger as it closes. Opening the sheet in
+	 * the same tick means that restore lands *after* the sheet has taken focus
+	 * and pulls it straight back out, leaving the sheet open but unfocused.
+	 * Yielding once lets the menu finish first.
+	 */
+	function openFromMenu(name: DrawerName) {
+		setTimeout(() => (drawer = name));
+	}
 </script>
 
 <PageTitle title="Expenses">
 	{#snippet action()}
-		<Button size="sm" onclick={() => (drawer = 'group')}>New group</Button>
+		<DropdownMenu.Root>
+			<DropdownMenu.Trigger>
+				{#snippet child({ props })}
+					<Button {...props} variant="ghost" size="icon" aria-label="Global settings">
+						<SettingsIcon class="size-5" />
+					</Button>
+				{/snippet}
+			</DropdownMenu.Trigger>
+			<DropdownMenu.Content align="end" class="w-48 bg-surface">
+				<DropdownMenu.Item onSelect={() => openFromMenu('people')}>
+					<UsersIcon class="size-4 text-subtle" />
+					People
+				</DropdownMenu.Item>
+				<DropdownMenu.Item onSelect={() => openFromMenu('categories')}>
+					<TagIcon class="size-4 text-subtle" />
+					Categories
+				</DropdownMenu.Item>
+				<DropdownMenu.Item onSelect={() => openFromMenu('settings')}>
+					<SlidersHorizontalIcon class="size-4 text-subtle" />
+					Settings
+				</DropdownMenu.Item>
+			</DropdownMenu.Content>
+		</DropdownMenu.Root>
 	{/snippet}
 </PageTitle>
 
-<Card title="Your balance">
-	{#each totalsByCurrency as total (total.currency.code)}
-		<Row label={total.currency.code}>
-			{#snippet trailing()}
-				<CurrencyText
-					minor={total.minor}
-					currency={total.currency}
-					signed={total.minor !== 0}
-					class="text-[17px] font-semibold text-ink"
-				/>
-			{/snippet}
-		</Row>
-	{/each}
-</Card>
+<Card title="Groups">
+	{#snippet action()}
+		<Button variant="ghost" size="sm" class="-me-2" onclick={() => (drawer = 'group')}>
+			Create +
+		</Button>
+	{/snippet}
 
-<Card title="Groups" footnote="Tap a group to see its expenses, balances and members.">
 	{#if cards.length === 0}
 		<EmptyState title="No groups yet" description="Create one to start splitting expenses." />
 	{:else}
 		{#each cards as card (card.group.id)}
-			<Row
-				label={card.group.name}
-				sublabel="{card.selfCaption} · {card.group.members.length} members"
-				href={resolve('/groups/[groupId]', { groupId: card.group.id })}
-			>
-				{#snippet leading()}
-					<MemberAvatarGroup people={card.group.members.map((member) => member.person)} />
-				{/snippet}
+			<Row label={card.group.name} href={resolve('/groups/[groupId]', { groupId: card.group.id })}>
 				{#snippet trailing()}
-					<span class="flex flex-col items-end">
-						<CurrencyText
-							minor={card.selfBalanceMinor}
-							currency={card.group.currency}
-							signed={card.selfBalanceMinor !== 0}
-							class="text-[17px] leading-tight text-ink"
-						/>
-						<CurrencyText
-							minor={card.totalMinor}
-							currency={card.group.currency}
-							class="pt-0.5 text-[13px] leading-tight text-subtle"
-						/>
-					</span>
+					<CurrencyText
+						minor={card.totalMinor}
+						currency={card.group.currency}
+						class="text-[17px] text-ink"
+					/>
 				{/snippet}
 			</Row>
 		{/each}
 	{/if}
-</Card>
-
-<Card title="Global">
-	<Row label="People" value={String(mockPeople.length)} onclick={() => (drawer = 'people')} />
-	<Row
-		label="Categories"
-		value={String(mockCategories.length)}
-		onclick={() => (drawer = 'categories')}
-	/>
-	<Row label="Settings" onclick={() => (drawer = 'settings')} />
 </Card>
 
 <Drawer
@@ -170,7 +145,7 @@
 >
 	<div class="card overflow-hidden rounded-card bg-surface">
 		{#each mockPeople as person (person.id)}
-			<Row label={person.name} value={person.isSelf ? 'You' : undefined} chevron={false}>
+			<Row label={person.name} chevron={false}>
 				{#snippet leading()}
 					<MemberAvatar {person} />
 				{/snippet}

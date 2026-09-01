@@ -1,10 +1,8 @@
 <script lang="ts">
-	import { describeExpense } from '$lib/domain/wording';
+	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import type { CurrencyMeta, ExpenseView, MemberSummary } from '$lib/domain/types';
 	import CategoryPill from './CategoryPill.svelte';
 	import CurrencyText from './CurrencyText.svelte';
-	import MemberAvatar from './MemberAvatar.svelte';
-	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 
 	let {
 		expense,
@@ -19,7 +17,17 @@
 	} = $props();
 
 	const payer = $derived(members.find((member) => member.id === expense.payerMemberId));
-	const described = $derived(describeExpense(expense, members, currency));
+
+	// Parsed as UTC on purpose: the stored value is a calendar day, and letting
+	// the local timezone shift it is exactly the bug the TEXT column avoids.
+	const day = $derived(
+		new Intl.DateTimeFormat('en-US', {
+			month: 'short',
+			day: 'numeric',
+			year: 'numeric',
+			timeZone: 'UTC'
+		}).format(new Date(`${expense.expenseDate}T00:00:00Z`))
+	);
 </script>
 
 <button
@@ -28,18 +36,19 @@
 	onclick={() => onselect?.(expense)}
 	class="flex w-full items-stretch gap-3 ps-4 text-start"
 >
-	<span class="shrink-0 py-3">
-		{#if payer}
-			<MemberAvatar person={payer.person} />
-		{/if}
-	</span>
-	<div data-row-body class="flex min-h-11 flex-1 items-center gap-3 py-3 pe-4">
+	<div data-row-body class="flex min-h-11 flex-1 items-center gap-3 py-3.5 pe-4">
 		<div class="min-w-0 flex-1">
 			<div class="truncate text-[17px] leading-tight text-ink">{expense.description}</div>
-			<div class="truncate pt-0.5 text-[15px] leading-tight text-subtle">{described.detail}</div>
-			{#if expense.category}
-				<div class="pt-1"><CategoryPill category={expense.category} /></div>
-			{/if}
+			<div class="flex items-center gap-1.5 truncate pt-1 text-[13px] leading-tight text-subtle">
+				<span>{day}</span>
+				{#if expense.category}
+					<span aria-hidden="true">·</span>
+					<CategoryPill category={expense.category} />
+				{/if}
+			</div>
+			<div class="truncate pt-1 text-[13px] leading-tight text-subtle">
+				Paid by {payer?.person.name ?? 'someone'}
+			</div>
 		</div>
 		<CurrencyText minor={expense.totalMinor} {currency} class="shrink-0 text-[17px] text-ink" />
 		<ChevronRightIcon class="size-5 shrink-0 text-chrome" aria-hidden="true" />

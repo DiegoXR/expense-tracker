@@ -1,17 +1,35 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 
-	let { title, footnote, children }: { title?: string; footnote?: string; children: Snippet } =
-		$props();
+	let {
+		title,
+		footnote,
+		action,
+		dividers = true,
+		children
+	}: {
+		title?: string;
+		footnote?: string;
+		/** Sits opposite the title, on the section header line. */
+		action?: Snippet;
+		/** Hairlines between rows. Off for short blocks that read better plain. */
+		dividers?: boolean;
+		children: Snippet;
+	} = $props();
 </script>
 
 <section class="px-4 pb-5">
-	{#if title}
-		<h2 class="px-4 pb-2 text-[13px] font-medium tracking-wide text-subtle uppercase">
-			{title}
-		</h2>
+	{#if title || action}
+		<div class="flex min-h-8 items-center justify-between gap-3 px-4 pb-2">
+			<h2 class="text-[13px] font-medium tracking-wide text-subtle uppercase">
+				{title ?? ''}
+			</h2>
+			{#if action}
+				{@render action()}
+			{/if}
+		</div>
 	{/if}
-	<div class="card overflow-hidden rounded-card bg-surface">
+	<div class="overflow-hidden rounded-card bg-surface" class:card={dividers}>
 		{@render children()}
 	</div>
 	{#if footnote}

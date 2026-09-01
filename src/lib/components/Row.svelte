@@ -9,6 +9,7 @@
 		href,
 		onclick,
 		chevron,
+		reserveChevron = false,
 		leading,
 		trailing,
 		muted = false
@@ -20,6 +21,11 @@
 		onclick?: () => void;
 		/** Defaults to true when the row navigates or opens something. */
 		chevron?: boolean;
+		/**
+		 * Keep the chevron's width without drawing one, so a static row's value
+		 * lines up with the tappable rows above and below it.
+		 */
+		reserveChevron?: boolean;
 		leading?: Snippet;
 		trailing?: Snippet;
 		muted?: boolean;
@@ -51,6 +57,8 @@
 
 		{#if showChevron}
 			<ChevronRightIcon class="size-5 shrink-0 text-chrome" aria-hidden="true" />
+		{:else if reserveChevron}
+			<span class="size-5 shrink-0" aria-hidden="true"></span>
 		{/if}
 	</div>
 {/snippet}
