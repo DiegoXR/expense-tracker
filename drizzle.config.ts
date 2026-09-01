@@ -1,18 +1,19 @@
 import { defineConfig } from 'drizzle-kit';
 
-if (!process.env.CLOUDFLARE_ACCOUNT_ID) throw new Error('CLOUDFLARE_ACCOUNT_ID is not set');
-if (!process.env.CLOUDFLARE_DATABASE_ID) throw new Error('CLOUDFLARE_DATABASE_ID is not set');
-if (!process.env.CLOUDFLARE_D1_TOKEN) throw new Error('CLOUDFLARE_D1_TOKEN is not set');
-
+/**
+ * drizzle-kit does exactly one job here: turn `schema.ts` into SQL migrations.
+ * Wrangler applies them, locally and remotely — see CLAUDE.md §5.
+ *
+ * There is deliberately no `driver` and no `dbCredentials`. Those only matter for
+ * commands that reach across the network, and we have none: `wrangler login`
+ * authenticates the tooling, and the Worker reaches D1 through its `DB` binding
+ * with no credential at all. That leaves nothing here to leak or rotate, and
+ * `pnpm db:generate` works on a fresh clone with no `.env`.
+ */
 export default defineConfig({
 	schema: './src/lib/server/db/schema.ts',
+	out: './drizzle',
 	dialect: 'sqlite',
-	driver: 'd1-http',
-	dbCredentials: {
-		accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
-		databaseId: process.env.CLOUDFLARE_DATABASE_ID,
-		token: process.env.CLOUDFLARE_D1_TOKEN
-	},
 	verbose: true,
 	strict: true
 });

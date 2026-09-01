@@ -8,6 +8,19 @@
 		"binding": "ASSETS",
 		"directory": ".svelte-kit/cloudflare"
 	},
+	// `database_id` is NOT a secret: it is an opaque resource identifier, and
+	// reaching the database still needs an account-scoped token or a Worker
+	// deployed to the account. Cloudflare's own templates commit it, and CI
+	// deploys need it present. Replace the placeholder with the id printed by
+	// `wrangler d1 create expense-tracker`.
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "expense-tracker",
+			"database_id": "53ec0056-151d-4349-80f5-848fd8e0b92b",
+			"migrations_dir": "drizzle"
+		}
+	],
 	"workers_dev": true,
 	"preview_urls": true
 }

@@ -6,11 +6,10 @@ import {
 	mergeBalances,
 	type MemberBalance
 } from './balance';
-import { mockExpensesByGroup, mockGroups, mockSettlementsByGroup } from './mock';
 import { simplifyDebts } from './settle';
 import { buildSplits } from './split';
 import { describeBalance, describeExpense, describeTransfer } from './wording';
-import type { CurrencyMeta, ExpenseView, MemberSummary } from './types';
+import type { CurrencyMeta, ExpenseView, MemberSummary, SettlementView } from './types';
 
 const USD: CurrencyMeta = {
 	code: 'USD',
@@ -113,17 +112,45 @@ describe('balances', () => {
 		);
 	});
 
-	it('sums to zero for every mock group', () => {
-		for (const group of mockGroups) {
-			const balances = mergeBalances(
-				group.members,
-				computeBalanceDeltas(
-					mockExpensesByGroup[group.id] ?? [],
-					mockSettlementsByGroup[group.id] ?? []
-				)
-			);
-			expect(() => assertBalancesSumToZero(balances)).not.toThrow();
-		}
+	it('sums to zero for a three-way split that does not divide evenly', () => {
+		// Whole percentages force 34/33/33, and a zero-decimal currency has no
+		// cents to hide a rounding error in. If largest-remainder ever slipped,
+		// this is where it would show.
+		const jordan: MemberSummary = {
+			id: 'gm-jordan',
+			groupId: 'g',
+			person: { id: 'p-jordan', name: 'Jordan', avatarColor: 'emerald', isSelf: false }
+		};
+		const trio = [alex, sam, jordan];
+
+		const apartment: ExpenseView = {
+			id: 'e2',
+			description: 'Apartment',
+			notes: null,
+			totalMinor: 1_250_000,
+			expenseDate: '2026-08-14',
+			payerMemberId: jordan.id,
+			category: null,
+			splits: buildSplits(1_250_000, [
+				{ memberId: alex.id, sharePct: 34 },
+				{ memberId: sam.id, sharePct: 33 },
+				{ memberId: jordan.id, sharePct: 33 }
+			])
+		};
+
+		const payment: SettlementView = {
+			id: 's2',
+			fromMemberId: alex.id,
+			toMemberId: jordan.id,
+			amountMinor: 100_000,
+			settledDate: '2026-08-15',
+			note: null
+		};
+
+		expect(apartment.splits.reduce((sum, split) => sum + split.shareMinor, 0)).toBe(1_250_000);
+
+		const balances = mergeBalances(trio, computeBalanceDeltas([apartment], [payment]));
+		expect(() => assertBalancesSumToZero(balances)).not.toThrow();
 	});
 });
 
@@ -148,21 +175,19 @@ describe('computeMemberLedger', () => {
 
 	it('agrees with the balance the group screen shows', () => {
 		// The breakdown panel must never contradict the figure beside it.
-		for (const group of mockGroups) {
-			const expenses = mockExpensesByGroup[group.id] ?? [];
-			const settlements = mockSettlementsByGroup[group.id] ?? [];
-			const balances = mergeBalances(group.members, computeBalanceDeltas(expenses, settlements));
+		const expenses = [dinner];
+		const settlements = [settlement];
+		const balances = mergeBalances(members, computeBalanceDeltas(expenses, settlements));
 
-			for (const balance of balances) {
-				const ledger = computeMemberLedger(balance.memberId, expenses, settlements);
-				expect(ledger.balanceMinor).toBe(balance.balanceMinor);
-				expect(
-					ledger.paidMinor -
-						ledger.shareMinor +
-						ledger.settlementsSentMinor -
-						ledger.settlementsReceivedMinor
-				).toBe(balance.balanceMinor);
-			}
+		for (const balance of balances) {
+			const ledger = computeMemberLedger(balance.memberId, expenses, settlements);
+			expect(ledger.balanceMinor).toBe(balance.balanceMinor);
+			expect(
+				ledger.paidMinor -
+					ledger.shareMinor +
+					ledger.settlementsSentMinor -
+					ledger.settlementsReceivedMinor
+			).toBe(balance.balanceMinor);
 		}
 	});
 });

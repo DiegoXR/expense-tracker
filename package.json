@@ -16,10 +16,12 @@
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
 		"gen": "wrangler types",
-		"db:push": "drizzle-kit push",
 		"db:generate": "drizzle-kit generate",
-		"db:migrate": "drizzle-kit migrate",
-		"db:studio": "drizzle-kit studio"
+		"db:migrate:local": "wrangler d1 migrations apply expense-tracker --local",
+		"db:migrate:remote": "wrangler d1 migrations apply expense-tracker --remote",
+		"db:list": "wrangler d1 migrations list expense-tracker --local",
+		"db:seed:local": "wrangler d1 execute expense-tracker --local --file=./seed/currencies.sql && wrangler d1 execute expense-tracker --local --file=./seed/categories.sql",
+		"db:seed:remote": "wrangler d1 execute expense-tracker --remote --file=./seed/currencies.sql && wrangler d1 execute expense-tracker --remote --file=./seed/categories.sql"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",

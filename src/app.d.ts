@@ -9,8 +9,12 @@ declare global {
 			cf?: IncomingRequestCfProperties;
 		}
 
+		interface Locals {
+			/** Drizzle client bound to this request's D1 instance. */
+			db: import('$lib/server/db').Database;
+		}
+
 		// interface Error {}
-		// interface Locals {}
 		// interface PageData {}
 		// interface PageState {}
 	}
