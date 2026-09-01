@@ -34,12 +34,16 @@ export default defineConfig(
 		}
 	},
 	{
-		// shadcn-svelte copies these in and the CLI rewrites them on update.
 		// `no-navigation-without-resolve` wants every href passed through
-		// `resolve()`, which a generic component that forwards an arbitrary href
-		// cannot do — that is the caller's job. Scoped off here rather than
-		// globally so our own components still get the check.
-		files: ['src/lib/components/ui/**/*.svelte'],
+		// `resolve()`, which a component forwarding an arbitrary caller-supplied
+		// href cannot do — that is the caller's job, and pages here do it. Listed
+		// file by file rather than disabled globally, so a page that hard-codes a
+		// path still gets caught.
+		files: [
+			'src/lib/components/ui/**/*.svelte',
+			'src/lib/components/Row.svelte',
+			'src/lib/components/BackHeader.svelte'
+		],
 		rules: {
 			'svelte/no-navigation-without-resolve': 'off'
 		}

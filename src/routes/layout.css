@@ -3,92 +3,64 @@
 @import 'shadcn-svelte/tailwind.css';
 @import '@fontsource-variable/inter';
 
-@custom-variant dark (&:is(.dark *));
+/* ------------------------------------------------------------------ *
+ * The palette: three greys, white, black. Nothing else.
+ *
+ * Balances read as positive or negative from their sign and their label,
+ * never from a hue — which keeps them legible to anyone who cannot tell
+ * two colours apart. Weight and size carry the emphasis instead.
+ *
+ * The one exception is people.avatar_color and categories.color, which
+ * appear only as small dots and avatar circles, never as text or fills.
+ * ------------------------------------------------------------------ */
 
+@theme {
+	--color-canvas: #f2f2f7;
+	--color-surface: #ffffff;
+	--color-chrome: #c7c7cc;
+	--color-subtle: #8e8e93;
+	--color-ink: #000000;
+
+	/* iOS grouped-list card corner. */
+	--radius-card: 1.25rem;
+}
+
+/*
+ * shadcn's tokens are remapped onto the palette above rather than run
+ * alongside it, so every shadcn component inherits the look without
+ * being restyled one by one.
+ */
 :root {
-	--background: oklch(1 0 0);
-	--foreground: oklch(0.145 0 0);
-	--card: oklch(1 0 0);
-	--card-foreground: oklch(0.145 0 0);
-	--popover: oklch(1 0 0);
-	--popover-foreground: oklch(0.145 0 0);
-	--primary: oklch(0.205 0 0);
-	--primary-foreground: oklch(0.985 0 0);
-	--secondary: oklch(0.97 0 0);
-	--secondary-foreground: oklch(0.205 0 0);
-	--muted: oklch(0.97 0 0);
-	--muted-foreground: oklch(0.556 0 0);
-	--accent: oklch(0.97 0 0);
-	--accent-foreground: oklch(0.205 0 0);
-	--destructive: oklch(0.577 0.245 27.325);
-	--border: oklch(0.922 0 0);
-	--input: oklch(0.922 0 0);
-	--ring: oklch(0.708 0 0);
-	--chart-1: oklch(0.87 0 0);
-	--chart-2: oklch(0.556 0 0);
-	--chart-3: oklch(0.439 0 0);
-	--chart-4: oklch(0.371 0 0);
-	--chart-5: oklch(0.269 0 0);
+	--background: var(--color-canvas);
+	--foreground: var(--color-ink);
+	--card: var(--color-surface);
+	--card-foreground: var(--color-ink);
+	--popover: var(--color-surface);
+	--popover-foreground: var(--color-ink);
+	--primary: var(--color-ink);
+	--primary-foreground: var(--color-surface);
+	--secondary: var(--color-canvas);
+	--secondary-foreground: var(--color-ink);
+	--muted: var(--color-canvas);
+	--muted-foreground: var(--color-subtle);
+	--accent: var(--color-canvas);
+	--accent-foreground: var(--color-ink);
+	--destructive: var(--color-ink);
+	--border: var(--color-chrome);
+	--input: var(--color-chrome);
+	--ring: var(--color-subtle);
 	--radius: 0.625rem;
-	--sidebar: oklch(0.985 0 0);
-	--sidebar-foreground: oklch(0.145 0 0);
-	--sidebar-primary: oklch(0.205 0 0);
-	--sidebar-primary-foreground: oklch(0.985 0 0);
-	--sidebar-accent: oklch(0.97 0 0);
-	--sidebar-accent-foreground: oklch(0.205 0 0);
-	--sidebar-border: oklch(0.922 0 0);
-	--sidebar-ring: oklch(0.708 0 0);
 }
 
-.dark {
-	--background: oklch(0.145 0 0);
-	--foreground: oklch(0.985 0 0);
-	--card: oklch(0.205 0 0);
-	--card-foreground: oklch(0.985 0 0);
-	--popover: oklch(0.205 0 0);
-	--popover-foreground: oklch(0.985 0 0);
-	--primary: oklch(0.922 0 0);
-	--primary-foreground: oklch(0.205 0 0);
-	--secondary: oklch(0.269 0 0);
-	--secondary-foreground: oklch(0.985 0 0);
-	--muted: oklch(0.269 0 0);
-	--muted-foreground: oklch(0.708 0 0);
-	--accent: oklch(0.269 0 0);
-	--accent-foreground: oklch(0.985 0 0);
-	--destructive: oklch(0.704 0.191 22.216);
-	--border: oklch(1 0 0 / 10%);
-	--input: oklch(1 0 0 / 15%);
-	--ring: oklch(0.556 0 0);
-	--chart-1: oklch(0.87 0 0);
-	--chart-2: oklch(0.556 0 0);
-	--chart-3: oklch(0.439 0 0);
-	--chart-4: oklch(0.371 0 0);
-	--chart-5: oklch(0.269 0 0);
-	--sidebar: oklch(0.205 0 0);
-	--sidebar-foreground: oklch(0.985 0 0);
-	--sidebar-primary: oklch(0.488 0.243 264.376);
-	--sidebar-primary-foreground: oklch(0.985 0 0);
-	--sidebar-accent: oklch(0.269 0 0);
-	--sidebar-accent-foreground: oklch(0.985 0 0);
-	--sidebar-border: oklch(1 0 0 / 10%);
-	--sidebar-ring: oklch(0.556 0 0);
-}
+/*
+ * Light only, deliberately. shadcn scaffolded a `dark` variant; we leave its
+ * tokens undefined rather than invent a dark palette nobody asked for. Adding
+ * one later means defining the same five values here — no component changes,
+ * because components only ever reference the tokens.
+ */
 
 @theme inline {
 	--font-sans: 'Inter Variable', sans-serif;
-	--color-sidebar-ring: var(--sidebar-ring);
-	--color-sidebar-border: var(--sidebar-border);
-	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-	--color-sidebar-accent: var(--sidebar-accent);
-	--color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-	--color-sidebar-primary: var(--sidebar-primary);
-	--color-sidebar-foreground: var(--sidebar-foreground);
-	--color-sidebar: var(--sidebar);
-	--color-chart-5: var(--chart-5);
-	--color-chart-4: var(--chart-4);
-	--color-chart-3: var(--chart-3);
-	--color-chart-2: var(--chart-2);
-	--color-chart-1: var(--chart-1);
 	--color-ring: var(--ring);
 	--color-input: var(--input);
 	--color-border: var(--border);
@@ -121,9 +93,15 @@
 		@apply border-border outline-ring/50;
 	}
 	body {
-		@apply bg-background text-foreground;
+		@apply bg-canvas text-ink;
+		/* The design target is a phone held in one hand. */
+		-webkit-text-size-adjust: 100%;
 	}
 	html {
 		@apply font-sans;
+	}
+	/* A ledger whose digits jitter between rows is a ledger nobody trusts. */
+	[data-money] {
+		font-variant-numeric: tabular-nums;
 	}
 }
