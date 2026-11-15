@@ -16,12 +16,15 @@
 	import Row from '$lib/components/Row.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import UsersIcon from '@lucide/svelte/icons/users';
 	import { computeMemberLedger, type MemberBalance } from '$lib/domain/balance';
 	import type { ExpenseView } from '$lib/domain/types';
 	import { describeBalance, describeExpense } from '$lib/domain/wording';
+	import type { SubmitFunction } from '@sveltejs/kit';
+	import { toast } from 'svelte-sonner';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -29,7 +32,7 @@
 	const group = $derived(data.group);
 	const totalMinor = $derived(data.expenses.reduce((sum, expense) => sum + expense.totalMinor, 0));
 
-	type DrawerName = 'expense' | 'detail' | 'balance' | 'payment' | 'members' | 'settings';
+	type DrawerName = 'expense' | 'detail' | 'balance' | 'members' | 'settings';
 	let drawer = $state<DrawerName | null>(null);
 	let inspected = $state<MemberBalance | null>(null);
 	let selected = $state<ExpenseView | null>(null);
@@ -47,21 +50,21 @@
 	let draftPayerMemberId = $state('');
 	let draftShares = $state<Record<string, number>>({});
 
-	function evenShares(): Record<string, number> {
-		const each = Math.floor(100 / group.members.length);
+	/**
+	 * 50/50 for a pair, the common case. Three or more open as 100/0/0 rather
+	 * than 34/33/33: an even split there is off the 5% step grid, and starting
+	 * from one payer keeps adjusting predictable. Either way it opens valid.
+	 */
+	function defaultShares(): Record<string, number> {
+		const pair = group.members.length === 2;
 		return Object.fromEntries(
-			group.members.map((member, i) => [
-				member.id,
-				// Whole percentages never divide evenly by three, so the first row
-				// absorbs the remainder and the editor opens already valid.
-				i === 0 ? 100 - each * (group.members.length - 1) : each
-			])
+			group.members.map((member, i) => [member.id, pair ? 50 : i === 0 ? 100 : 0])
 		);
 	}
 
 	function openNewExpense() {
 		editingId = null;
-		draftShares = evenShares();
+		draftShares = defaultShares();
 		draftTotalMinor = 0;
 		draftDate = new Date().toISOString().slice(0, 10);
 		// The one job `people.is_self` has: the person keeping the ledger enters
@@ -85,9 +88,44 @@
 		drawer = 'expense';
 	}
 
-	function openPayment() {
-		draftDate = new Date().toISOString().slice(0, 10);
-		drawer = 'payment';
+	/** True from the tap on Save or Delete until the server has answered. */
+	let saving = $state(false);
+
+	/**
+	 * Submit, keep the sheet open and locked while the request is in flight, and
+	 * close it only once the list has reloaded with the change in it.
+	 *
+	 * `reset: false` throughout: SvelteKit's default clears the form on success,
+	 * which is what made the fields vanish before the sheet went away. On a
+	 * validation failure the sheet stays open with the input intact and the
+	 * message beside the field; a field-less failure has nowhere to show, so it
+	 * becomes a toast. A network or server error never calls `update`, which
+	 * would replace the page with the error page and lose what was typed.
+	 */
+	function submitAndClose(done: string): SubmitFunction {
+		return () => {
+			saving = true;
+			return async ({ result, update }) => {
+				try {
+					if (result.type === 'success') {
+						await update({ reset: false });
+						drawer = null;
+						toast.success(done);
+					} else if (result.type === 'failure') {
+						await update({ reset: false });
+						if (!result.data?.field) {
+							toast.error(result.data?.message ?? "Couldn't save. Try again.");
+						}
+					} else if (result.type === 'error') {
+						toast.error("Couldn't save. Check your connection and try again.");
+					} else {
+						await update();
+					}
+				} finally {
+					saving = false;
+				}
+			};
+		};
 	}
 
 	/** See the overview page: let the menu close before the sheet takes focus. */
@@ -96,126 +134,127 @@
 	}
 </script>
 
-<BackHeader
-	href={resolve('/')}
-	backLabel="Groups"
-	title={group.name}
-	subtitle={group.description ?? undefined}
->
-	{#snippet action()}
-		<DropdownMenu.Root>
-			<DropdownMenu.Trigger>
-				{#snippet child({ props })}
-					<Button {...props} variant="ghost" size="icon" aria-label="Group settings">
-						<SettingsIcon class="size-5" />
-					</Button>
-				{/snippet}
-			</DropdownMenu.Trigger>
-			<DropdownMenu.Content align="end" class="w-48 bg-surface">
-				<DropdownMenu.Item onSelect={() => openFromMenu('settings')}>
-					<SlidersHorizontalIcon class="size-4 text-subtle" />
-					Group
-				</DropdownMenu.Item>
-				<DropdownMenu.Item onSelect={() => openFromMenu('members')}>
-					<UsersIcon class="size-4 text-subtle" />
-					Members
-				</DropdownMenu.Item>
-			</DropdownMenu.Content>
-		</DropdownMenu.Root>
-	{/snippet}
-</BackHeader>
-
-<Card title="Balances" footnote="Balances in a group always add up to zero." dividers={false}>
-	<Row label="Spent in total" chevron={false} reserveChevron>
-		{#snippet trailing()}
-			<CurrencyText
-				minor={totalMinor}
-				currency={group.currency}
-				class="text-[17px] font-semibold text-ink"
-			/>
-		{/snippet}
-	</Row>
-
-	{#if data.balances.length === 0}
-		<EmptyState title="No members yet" description="Add someone to start splitting expenses." />
-	{:else}
-		{#each data.balances as balance (balance.memberId)}
-			{@const member = group.members.find((candidate) => candidate.id === balance.memberId)}
-			<Row
-				label={member?.person.name ?? 'Unknown'}
-				onclick={() => {
-					inspected = balance;
-					drawer = 'balance';
-				}}
-			>
-				{#snippet leading()}
-					{#if member}
-						<MemberAvatar person={member.person} />
-					{/if}
-				{/snippet}
-				{#snippet trailing()}
-					<BalanceBadge {balance} currency={group.currency} />
-				{/snippet}
-			</Row>
-		{/each}
-	{/if}
-</Card>
-
-<ExpenseList
-	expenses={data.expenses}
-	members={group.members}
-	currency={group.currency}
-	onselect={(expense) => {
-		selected = expense;
-		drawer = 'detail';
-	}}
-/>
-
-{#if data.settlements.length > 0}
-	<Card title="Payments">
-		{#each data.settlements as settlement (settlement.id)}
-			{@const from = group.members.find((m) => m.id === settlement.fromMemberId)}
-			{@const to = group.members.find((m) => m.id === settlement.toMemberId)}
-			<Row
-				label="{from?.person.name ?? 'Someone'} paid {to?.person.name ?? 'someone'}"
-				sublabel={settlement.settledDate}
-				chevron={false}
-			>
-				{#snippet trailing()}
-					<div class="flex items-center gap-3">
-						<CurrencyText
-							minor={settlement.amountMinor}
-							currency={group.currency}
-							class="text-[17px] text-ink"
-						/>
-						<form method="POST" action="?/deleteSettlement" use:enhance>
-							<input type="hidden" name="settlementId" value={settlement.id} />
-							<button type="submit" class="min-h-11 px-1 text-[15px] text-subtle">Undo</button>
-						</form>
-					</div>
-				{/snippet}
-			</Row>
-		{/each}
-	</Card>
-{/if}
-
-<div class="space-y-3 px-4 pb-6">
-	<Button class="min-h-12 w-full" onclick={openNewExpense} disabled={group.members.length === 0}>
-		Add expense
-	</Button>
-	<Button
-		variant="outline"
-		class="min-h-12 w-full"
-		onclick={openPayment}
-		disabled={group.members.length < 2}
+<!--
+	Exactly one screen tall: the header, balances and the Add button stay put and
+	the expense list scrolls inside its card, so a long ledger never pushes the
+	button off screen. The outer scroll is only a fallback for very short screens.
+-->
+<div class="flex h-[calc(100dvh_-_env(safe-area-inset-bottom))] flex-col overflow-y-auto">
+	<BackHeader
+		href={resolve('/')}
+		backLabel="Groups"
+		title={group.name}
+		subtitle={group.description ?? undefined}
 	>
-		Record a payment
-	</Button>
+		{#snippet action()}
+			<DropdownMenu.Root>
+				<DropdownMenu.Trigger>
+					{#snippet child({ props })}
+						<Button {...props} variant="ghost" size="icon" aria-label="Group settings">
+							<SettingsIcon class="size-5" />
+						</Button>
+					{/snippet}
+				</DropdownMenu.Trigger>
+				<DropdownMenu.Content align="end" class="w-48 bg-surface">
+					<DropdownMenu.Item onSelect={() => openFromMenu('settings')}>
+						<SlidersHorizontalIcon class="size-4 text-subtle" />
+						Group
+					</DropdownMenu.Item>
+					<DropdownMenu.Item onSelect={() => openFromMenu('members')}>
+						<UsersIcon class="size-4 text-subtle" />
+						Members
+					</DropdownMenu.Item>
+				</DropdownMenu.Content>
+			</DropdownMenu.Root>
+		{/snippet}
+	</BackHeader>
+
+	<Card title="Balances" footnote="Balances in a group always add up to zero." dividers={false}>
+		<Row label="Spent in total" chevron={false} reserveChevron>
+			{#snippet trailing()}
+				<CurrencyText
+					minor={totalMinor}
+					currency={group.currency}
+					class="text-[17px] font-semibold text-ink"
+				/>
+			{/snippet}
+		</Row>
+
+		{#if data.balances.length === 0}
+			<EmptyState title="No members yet" description="Add someone to start splitting expenses." />
+		{:else}
+			{#each data.balances as balance (balance.memberId)}
+				{@const member = group.members.find((candidate) => candidate.id === balance.memberId)}
+				<Row
+					label={member?.person.name ?? 'Unknown'}
+					onclick={() => {
+						inspected = balance;
+						drawer = 'balance';
+					}}
+				>
+					{#snippet leading()}
+						{#if member}
+							<MemberAvatar person={member.person} />
+						{/if}
+					{/snippet}
+					{#snippet trailing()}
+						<BalanceBadge {balance} currency={group.currency} />
+					{/snippet}
+				</Row>
+			{/each}
+		{/if}
+	</Card>
+
+	<ExpenseList
+		expenses={data.expenses}
+		members={group.members}
+		currency={group.currency}
+		fill
+		onselect={(expense) => {
+			selected = expense;
+			drawer = 'detail';
+		}}
+	/>
+
+	{#if data.settlements.length > 0}
+		<Card title="Payments">
+			{#each data.settlements as settlement (settlement.id)}
+				{@const from = group.members.find((m) => m.id === settlement.fromMemberId)}
+				{@const to = group.members.find((m) => m.id === settlement.toMemberId)}
+				<Row
+					label="{from?.person.name ?? 'Someone'} paid {to?.person.name ?? 'someone'}"
+					sublabel={settlement.settledDate}
+					chevron={false}
+				>
+					{#snippet trailing()}
+						<div class="flex items-center gap-3">
+							<CurrencyText
+								minor={settlement.amountMinor}
+								currency={group.currency}
+								class="text-[17px] text-ink"
+							/>
+							<form method="POST" action="?/deleteSettlement" use:enhance>
+								<input type="hidden" name="settlementId" value={settlement.id} />
+								<button type="submit" class="min-h-11 px-1 text-[15px] text-subtle">Undo</button>
+							</form>
+						</div>
+					{/snippet}
+				</Row>
+			{/each}
+		</Card>
+	{/if}
+
+	<div class="shrink-0 px-4 pb-6">
+		<Button class="min-h-12 w-full" onclick={openNewExpense} disabled={group.members.length === 0}>
+			Add expense
+		</Button>
+	</div>
 </div>
 
 <Drawer
 	open={drawer === 'expense'}
 	onclose={() => (drawer = null)}
+	dismissible={!saving}
 	title={editingId ? 'Edit expense' : 'New expense'}
 	description="Who paid, how much, and how it splits."
 >
@@ -223,13 +262,17 @@
 		id="expense-form"
 		method="POST"
 		action={editingId ? '?/updateExpense' : '?/createExpense'}
-		use:enhance
+		use:enhance={submitAndClose(editingId ? 'Changes saved' : 'Expense saved')}
 	>
 		{#if editingId}
 			<input type="hidden" name="expenseId" value={editingId} />
 		{/if}
 
-		<div class="space-y-5 pb-2">
+		<!--
+			Disabling the fieldset after the submit is safe: the form data was read
+			before `saving` flipped, so disabled fields are not dropped from it.
+		-->
+		<fieldset disabled={saving} class="min-w-0 space-y-5 pb-2 disabled:opacity-60">
 			<div>
 				<label for="expense-description" class="block text-[13px] font-medium text-subtle">
 					Description
@@ -294,11 +337,16 @@
 				bind:shares={draftShares}
 			/>
 			<FieldError message={form?.field === 'split' ? form.message : undefined} />
-		</div>
+		</fieldset>
 	</form>
 	{#snippet footer()}
-		<Button type="submit" form="expense-form" class="min-h-12 w-full">
-			{editingId ? 'Save changes' : 'Save expense'}
+		<Button type="submit" form="expense-form" class="min-h-12 w-full" disabled={saving}>
+			{#if saving}
+				<Loader2Icon class="size-5 animate-spin" aria-hidden="true" />
+				{editingId ? 'Saving changes…' : 'Saving expense…'}
+			{:else}
+				{editingId ? 'Save changes' : 'Save expense'}
+			{/if}
 		</Button>
 	{/snippet}
 </Drawer>
@@ -306,6 +354,7 @@
 <Drawer
 	open={drawer === 'detail'}
 	onclose={() => (drawer = null)}
+	dismissible={!saving}
 	title={selected?.description ?? 'Expense'}
 	description={selected ? describeExpense(selected, group.members, group.currency).title : ''}
 >
@@ -334,66 +383,32 @@
 			{/each}
 		</div>
 
-		<form method="POST" action="?/deleteExpense" use:enhance class="pt-4">
+		<form
+			method="POST"
+			action="?/deleteExpense"
+			use:enhance={submitAndClose('Expense deleted')}
+			class="pt-4"
+		>
 			<input type="hidden" name="expenseId" value={selected.id} />
-			<Button type="submit" variant="outline" class="min-h-12 w-full">Delete expense</Button>
+			<Button type="submit" variant="outline" class="min-h-12 w-full" disabled={saving}>
+				{#if saving}
+					<Loader2Icon class="size-5 animate-spin" aria-hidden="true" />
+					Deleting…
+				{:else}
+					Delete expense
+				{/if}
+			</Button>
 		</form>
 	{/if}
 	{#snippet footer()}
 		<Button
 			variant="outline"
 			class="min-h-12 w-full"
+			disabled={saving}
 			onclick={() => selected && openEditExpense(selected)}
 		>
 			Edit expense
 		</Button>
-	{/snippet}
-</Drawer>
-
-<Drawer
-	open={drawer === 'payment'}
-	onclose={() => (drawer = null)}
-	title="Record a payment"
-	description="A real transfer between two members, to clear a debt."
->
-	<form id="payment-form" method="POST" action="?/recordSettlement" use:enhance>
-		<div class="space-y-5 pb-2">
-			<div>
-				<label for="payment-from" class="block text-[13px] font-medium text-subtle">From</label>
-				<select
-					id="payment-from"
-					name="fromMemberId"
-					class="mt-1 min-h-11 w-full rounded-md border border-chrome px-3 text-[17px] outline-none focus:border-ink"
-				>
-					{#each group.members as member (member.id)}
-						<option value={member.id}>{member.person.name}</option>
-					{/each}
-				</select>
-				<FieldError message={form?.field === 'fromMemberId' ? form.message : undefined} />
-			</div>
-
-			<div>
-				<label for="payment-to" class="block text-[13px] font-medium text-subtle">To</label>
-				<select
-					id="payment-to"
-					name="toMemberId"
-					class="mt-1 min-h-11 w-full rounded-md border border-chrome px-3 text-[17px] outline-none focus:border-ink"
-				>
-					{#each group.members as member (member.id)}
-						<option value={member.id}>{member.person.name}</option>
-					{/each}
-				</select>
-				<FieldError message={form?.field === 'toMemberId' ? form.message : undefined} />
-			</div>
-
-			<MoneyInput currency={group.currency} name="amountMinor" label="Amount" />
-			<FieldError message={form?.field === 'amountMinor' ? form.message : undefined} />
-
-			<DateField bind:value={draftDate} name="settledDate" label="Date" />
-		</div>
-	</form>
-	{#snippet footer()}
-		<Button type="submit" form="payment-form" class="min-h-12 w-full">Record payment</Button>
 	{/snippet}
 </Drawer>
 

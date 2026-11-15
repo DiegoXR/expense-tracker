@@ -8,12 +8,15 @@
 		expenses,
 		members,
 		currency,
-		onselect
+		onselect,
+		fill = false
 	}: {
 		expenses: ExpenseView[];
 		members: MemberSummary[];
 		currency: CurrencyMeta;
 		onselect?: (expense: ExpenseView) => void;
+		/** See Card: scroll inside the card instead of growing the page. */
+		fill?: boolean;
 	} = $props();
 
 	// One board, newest first, hairlines between rows — the same shape the group
@@ -22,7 +25,7 @@
 	const ordered = $derived([...expenses].sort((a, b) => (a.expenseDate < b.expenseDate ? 1 : -1)));
 </script>
 
-<Card title="Expenses">
+<Card title="Expenses" {fill}>
 	{#if ordered.length === 0}
 		<EmptyState title="No expenses yet" description="Add the first one to start the ledger." />
 	{:else}

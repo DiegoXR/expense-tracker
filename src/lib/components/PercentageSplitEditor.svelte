@@ -4,7 +4,7 @@
 	import type { CurrencyMeta, MemberSummary } from '$lib/domain/types';
 	import CurrencyText from './CurrencyText.svelte';
 	import MemberAvatar from './MemberAvatar.svelte';
-	import PercentInput from './PercentInput.svelte';
+	import PercentStepper from './PercentStepper.svelte';
 
 	let {
 		members,
@@ -46,7 +46,20 @@
 		if (!next) shares[memberId] = 0;
 	}
 
-	/** Whole percentages mean three ways is 34/33/33; this absorbs the odd point. */
+	/**
+	 * With exactly two people in the split, the other share is never a choice:
+	 * it is whatever is left, so one tap moves both (55/45). With three or more
+	 * there is no obvious row to take from, so the remainder stays visible and
+	 * "Give rest" settles it.
+	 */
+	function setShare(memberId: string, pct: number) {
+		shares[memberId] = pct;
+		if (active.length !== 2) return;
+		const other = active.find((member) => member.id !== memberId);
+		if (other) shares[other.id] = PERCENT_TOTAL - pct;
+	}
+
+	/** Hands whatever is unassigned (or over) to one member in a single tap. */
 	function giveRemainder(memberId: string) {
 		shares[memberId] = (shares[memberId] ?? 0) + remainingPct;
 	}
@@ -56,9 +69,9 @@
 	<div class="flex items-baseline justify-between px-1 pb-2">
 		<span class="text-[13px] font-medium text-subtle">Split</span>
 		<!--
-			No auto-normalising while typing. Redistributing the other rows makes
-			values jump under the cursor and the user can never land on the number
-			they wanted; an honest remainder is kinder than a helpful surprise.
+			Beyond the two-person case (see setShare), no auto-normalising: spreading
+			a change across several rows moves values the user did not touch, and an
+			honest remainder is kinder than a helpful surprise.
 		-->
 		<span
 			aria-live="polite"
@@ -112,9 +125,9 @@
 								Give rest
 							</button>
 						{/if}
-						<PercentInput
-							bind:pct={shares[member.id]}
-							id="split-{member.id}"
+						<PercentStepper
+							pct={shares[member.id] ?? 0}
+							onchange={(pct) => setShare(member.id, pct)}
 							label="{member.person.name}'s share"
 							invalid={!isValid}
 						/>

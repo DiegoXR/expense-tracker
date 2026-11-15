@@ -37,7 +37,7 @@
 
 {#snippet body()}
 	<!-- 44px minimum: this is a phone, and nothing here is hover-only. -->
-	<div data-row-body class="flex min-h-11 flex-1 items-center gap-3 py-2.5 pe-4 text-start">
+	<div data-row-body class="flex min-h-11 min-w-0 flex-1 items-center gap-3 py-2.5 pe-4 text-start">
 		<div class="min-w-0 flex-1">
 			<div class="truncate text-[17px] leading-tight {muted ? 'text-subtle' : 'text-ink'}">
 				{label}

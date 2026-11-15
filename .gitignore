@@ -15,6 +15,17 @@ worker-configuration.d.ts
 .DS_Store
 Thumbs.db
 
+# Database data. Real data never belongs in the repo: `.wrangler` above holds
+# the local D1 state, these catch exports and SQLite files anywhere else.
+# Migrations (drizzle/) and seeds (seed/) are schema and defaults, not data.
+/backups
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.db
+*.db-*
+*.export.sql
+
 # Env
 # .env holds credentials for Node tooling (drizzle-kit).
 .env

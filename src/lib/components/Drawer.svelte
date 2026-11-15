@@ -12,6 +12,7 @@
 		onclose,
 		title,
 		description,
+		dismissible = true,
 		children,
 		footer
 	}: {
@@ -19,14 +20,22 @@
 		onclose: () => void;
 		title: string;
 		description?: string;
+		/**
+		 * False while a save is in flight: closing then would hide the outcome,
+		 * and the page closes the sheet itself once the save lands.
+		 */
+		dismissible?: boolean;
 		children: Snippet;
 		footer?: Snippet;
 	} = $props();
 </script>
 
-<Sheet.Root {open} onOpenChange={(next) => !next && onclose()}>
+<Sheet.Root {open} onOpenChange={(next) => !next && dismissible && onclose()}>
 	<Sheet.Content
 		side="bottom"
+		showCloseButton={dismissible}
+		interactOutsideBehavior={dismissible ? 'close' : 'ignore'}
+		escapeKeydownBehavior={dismissible ? 'close' : 'ignore'}
 		class="mx-auto max-h-[92dvh] max-w-[440px] gap-0 rounded-t-card border-chrome bg-surface p-0"
 	>
 		<Sheet.Header class="gap-1 px-4 pt-5 pb-3 text-start">

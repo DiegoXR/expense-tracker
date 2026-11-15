@@ -18,9 +18,13 @@
 			"binding": "DB",
 			"database_name": "expense-tracker",
 			"database_id": "53ec0056-151d-4349-80f5-848fd8e0b92b",
-			"migrations_dir": "drizzle"
+			"migrations_dir": "drizzle",
+			// Local dev (`pnpm dev`) reads and writes the production database too:
+			// one personal ledger, behind Cloudflare Access, so a second copy only
+			// drifts. Needs `wrangler login`. Deploys ignore this flag.
+			"remote": true
 		}
 	],
 	"workers_dev": true,
-	"preview_urls": true
+	"preview_urls": false
 }

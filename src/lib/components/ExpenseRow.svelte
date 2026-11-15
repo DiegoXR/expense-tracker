@@ -36,21 +36,36 @@
 	onclick={() => onselect?.(expense)}
 	class="flex w-full items-stretch gap-3 ps-4 text-start"
 >
-	<div data-row-body class="flex min-h-11 flex-1 items-center gap-3 py-3.5 pe-4">
-		<div class="min-w-0 flex-1">
-			<div class="truncate text-[17px] leading-tight text-ink">{expense.description}</div>
-			<div class="flex items-center gap-1.5 truncate pt-1 text-[13px] leading-tight text-subtle">
+	<!-- min-w-0: a flex item otherwise refuses to shrink below its content, so a
+	     long description widened the row instead of truncating. -->
+	<div data-row-body class="flex min-h-11 min-w-0 flex-1 items-center gap-3 py-3.5 pe-4">
+		<!--
+			The description gets the whole first line; the amount sits beside the two
+			short meta lines below it. Centred against all three, a wide amount
+			(¥110,000,000.00) used to cut the description off halfway.
+		-->
+		<div class="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] gap-x-3">
+			<div class="col-span-2 truncate text-[17px] leading-tight text-ink">
+				{expense.description}
+			</div>
+			<div
+				class="col-start-1 flex items-center gap-1.5 truncate pt-1 text-[13px] leading-tight text-subtle"
+			>
 				<span>{day}</span>
 				{#if expense.category}
 					<span aria-hidden="true">·</span>
 					<CategoryPill category={expense.category} />
 				{/if}
 			</div>
-			<div class="truncate pt-1 text-[13px] leading-tight text-subtle">
+			<div class="col-start-1 truncate pt-1 text-[13px] leading-tight text-subtle">
 				Paid by {payer?.person.name ?? 'someone'}
 			</div>
+			<CurrencyText
+				minor={expense.totalMinor}
+				{currency}
+				class="col-start-2 row-span-2 row-start-2 self-center pt-1 text-[17px] text-ink"
+			/>
 		</div>
-		<CurrencyText minor={expense.totalMinor} {currency} class="shrink-0 text-[17px] text-ink" />
 		<ChevronRightIcon class="size-5 shrink-0 text-chrome" aria-hidden="true" />
 	</div>
 </button>

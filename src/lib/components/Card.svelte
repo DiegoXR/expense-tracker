@@ -6,6 +6,7 @@
 		footnote,
 		action,
 		dividers = true,
+		fill = false,
 		children
 	}: {
 		title?: string;
@@ -14,13 +15,18 @@
 		action?: Snippet;
 		/** Hairlines between rows. Off for short blocks that read better plain. */
 		dividers?: boolean;
+		/**
+		 * Takes the space left in a flex-column parent and scrolls its rows inside
+		 * the card, so the header and whatever sits below stay on screen.
+		 */
+		fill?: boolean;
 		children: Snippet;
 	} = $props();
 </script>
 
-<section class="px-4 pb-5">
+<section class={['px-4 pb-5', fill && 'flex min-h-44 flex-1 flex-col']}>
 	{#if title || action}
-		<div class="flex min-h-8 items-center justify-between gap-3 px-4 pb-2">
+		<div class="flex min-h-8 shrink-0 items-center justify-between gap-3 px-4 pb-2">
 			<h2 class="text-[13px] font-medium tracking-wide text-subtle uppercase">
 				{title ?? ''}
 			</h2>
@@ -29,7 +35,13 @@
 			{/if}
 		</div>
 	{/if}
-	<div class="overflow-hidden rounded-card bg-surface" class:card={dividers}>
+	<div
+		class={[
+			'rounded-card bg-surface',
+			fill ? 'min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain' : 'overflow-hidden'
+		]}
+		class:card={dividers}
+	>
 		{@render children()}
 	</div>
 	{#if footnote}
