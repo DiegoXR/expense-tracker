@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { CurrencyMeta, ExpenseView, MemberSummary } from '$lib/domain/types';
+	import type { Snippet } from 'svelte';
 	import Card from './Card.svelte';
 	import EmptyState from './EmptyState.svelte';
 	import ExpenseRow from './ExpenseRow.svelte';
@@ -9,7 +10,8 @@
 		members,
 		currency,
 		onselect,
-		fill = false
+		fill = false,
+		action
 	}: {
 		expenses: ExpenseView[];
 		members: MemberSummary[];
@@ -17,6 +19,8 @@
 		onselect?: (expense: ExpenseView) => void;
 		/** See Card: scroll inside the card instead of growing the page. */
 		fill?: boolean;
+		/** See Card: sits opposite the "Expenses" title. */
+		action?: Snippet;
 	} = $props();
 
 	// One board, newest first, hairlines between rows — the same shape the group
@@ -25,7 +29,7 @@
 	const ordered = $derived([...expenses].sort((a, b) => (a.expenseDate < b.expenseDate ? 1 : -1)));
 </script>
 
-<Card title="Expenses" {fill}>
+<Card title="Expenses" {fill} {action}>
 	{#if ordered.length === 0}
 		<EmptyState title="No expenses yet" description="Add the first one to start the ledger." />
 	{:else}

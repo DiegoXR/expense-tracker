@@ -1,14 +1,13 @@
 /**
  * Every user-facing sentence the ledger produces, in one place.
  *
- * Always third person, never "you". The whole app sits behind one shared
- * password with no per-user session, so there is nobody for "you" to refer to —
- * every reader sees the same ledger and every member is named.
+ * Always third person, never "you". The app has no per-user session (access is
+ * gated at the edge, by Cloudflare Access), so there is nobody for "you" to
+ * refer to — every reader sees the same ledger and every member is named.
  */
 
 import type { MemberBalance } from './balance';
 import { formatMinor } from './money';
-import type { Transfer } from './settle';
 import type { CurrencyMeta, ExpenseView, MemberSummary } from './types';
 
 /** Joins clauses the way English does: "a", "a and b", "a, b and c". */
@@ -83,14 +82,4 @@ export function describeBalance(balance: MemberBalance): string {
 		case 'settled':
 			return 'Settled up';
 	}
-}
-
-/** One suggested transfer: "Sam pays Alex $40.00". */
-export function describeTransfer(
-	transfer: Transfer,
-	members: MemberSummary[],
-	currency: CurrencyMeta
-): string {
-	const byId = new Map(members.map((member) => [member.id, member]));
-	return `${nameOf(byId.get(transfer.fromMemberId))} pays ${nameOf(byId.get(transfer.toMemberId))} ${formatMinor(transfer.amountMinor, currency)}`;
 }

@@ -11,15 +11,15 @@
 	import Row from '$lib/components/Row.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+	import * as NativeSelect from '$lib/components/ui/native-select/index.js';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
-	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import TagIcon from '@lucide/svelte/icons/tag';
 	import UsersIcon from '@lucide/svelte/icons/users';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
-	type DrawerName = 'group' | 'people' | 'categories' | 'settings';
+	type DrawerName = 'group' | 'people' | 'categories';
 	let drawer = $state<DrawerName | null>(null);
 
 	/**
@@ -51,10 +51,6 @@
 					<TagIcon class="size-4 text-subtle" />
 					Categories
 				</DropdownMenu.Item>
-				<DropdownMenu.Item onSelect={() => openFromMenu('settings')}>
-					<SlidersHorizontalIcon class="size-4 text-subtle" />
-					Settings
-				</DropdownMenu.Item>
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>
 	{/snippet}
@@ -63,7 +59,7 @@
 <Card title="Groups">
 	{#snippet action()}
 		<Button variant="ghost" size="sm" class="-me-2" onclick={() => (drawer = 'group')}>
-			Create +
+			Add +
 		</Button>
 	{/snippet}
 
@@ -121,15 +117,11 @@
 				<label for="group-currency" class="block text-[13px] font-medium text-subtle">
 					Currency
 				</label>
-				<select
-					id="group-currency"
-					name="currencyCode"
-					class="mt-1 min-h-11 w-full rounded-md border border-chrome px-3 text-[17px] outline-none focus:border-ink"
-				>
+				<NativeSelect.Root id="group-currency" name="currencyCode" class="mt-1">
 					{#each data.currencies as currency (currency.code)}
-						<option value={currency.code}>{currency.code}</option>
+						<NativeSelect.Option value={currency.code}>{currency.code}</NativeSelect.Option>
 					{/each}
-				</select>
+				</NativeSelect.Root>
 				<FieldError message={form?.field === 'currencyCode' ? form.message : undefined} />
 			</div>
 
@@ -237,12 +229,6 @@
 	{#snippet footer()}
 		<Button type="submit" form="create-category" class="min-h-12 w-full">Add category</Button>
 	{/snippet}
-</Drawer>
-
-<Drawer open={drawer === 'settings'} onclose={() => (drawer = null)} title="Settings">
-	<div class="card overflow-hidden rounded-card bg-surface">
-		<Row label="Sign out" chevron={false} muted />
-	</div>
 </Drawer>
 
 <style>

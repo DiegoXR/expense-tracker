@@ -11,8 +11,7 @@
 		chevron,
 		reserveChevron = false,
 		leading,
-		trailing,
-		muted = false
+		trailing
 	}: {
 		label: string;
 		sublabel?: string;
@@ -28,7 +27,6 @@
 		reserveChevron?: boolean;
 		leading?: Snippet;
 		trailing?: Snippet;
-		muted?: boolean;
 	} = $props();
 
 	const interactive = $derived(Boolean(href || onclick));
@@ -39,7 +37,7 @@
 	<!-- 44px minimum: this is a phone, and nothing here is hover-only. -->
 	<div data-row-body class="flex min-h-11 min-w-0 flex-1 items-center gap-3 py-2.5 pe-4 text-start">
 		<div class="min-w-0 flex-1">
-			<div class="truncate text-[17px] leading-tight {muted ? 'text-subtle' : 'text-ink'}">
+			<div class="truncate text-[17px] leading-tight text-ink">
 				{label}
 			</div>
 			{#if sublabel}

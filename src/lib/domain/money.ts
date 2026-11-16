@@ -133,17 +133,3 @@ export function formatMinorPlain(minor: number, decimals: number): string {
 	const digits = String(Math.abs(minor)).padStart(decimals + 1, '0');
 	return `${negative ? '-' : ''}${digits.slice(0, -decimals)}.${digits.slice(-decimals)}`;
 }
-
-/**
- * Parses a share percentage. Whole numbers only, in every currency.
- * Fractional percents are rejected by design — they buy nothing and complicate every split.
- */
-export function parsePercent(input: string): number {
-	const trimmed = input.trim().replace('%', '');
-	if (trimmed === '') throw new Error('Enter a percentage.');
-	if (!/^\d+$/.test(trimmed)) throw new Error('Use a whole number, without decimals.');
-
-	const pct = Number(trimmed);
-	if (pct > PERCENT_TOTAL) throw new Error('A share cannot exceed 100%.');
-	return pct;
-}

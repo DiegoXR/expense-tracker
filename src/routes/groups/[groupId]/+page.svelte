@@ -16,6 +16,7 @@
 	import Row from '$lib/components/Row.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+	import * as NativeSelect from '$lib/components/ui/native-select/index.js';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
@@ -135,9 +136,10 @@
 </script>
 
 <!--
-	Exactly one screen tall: the header, balances and the Add button stay put and
-	the expense list scrolls inside its card, so a long ledger never pushes the
-	button off screen. The outer scroll is only a fallback for very short screens.
+	Exactly one screen tall: the header and balances stay put and the expense
+	list runs to the bottom edge, scrolling inside its card. "Add +" lives in the
+	list's header, so a long ledger never pushes it off screen. The outer scroll
+	is only a fallback for very short screens.
 -->
 <div class="flex h-[calc(100dvh_-_env(safe-area-inset-bottom))] flex-col overflow-y-auto">
 	<BackHeader
@@ -214,7 +216,20 @@
 			selected = expense;
 			drawer = 'detail';
 		}}
-	/>
+	>
+		{#snippet action()}
+			<!-- Same shape as "Add +" on the overview, so the list can run to the bottom. -->
+			<Button
+				variant="ghost"
+				size="sm"
+				class="-me-2"
+				onclick={openNewExpense}
+				disabled={group.members.length === 0}
+			>
+				Add +
+			</Button>
+		{/snippet}
+	</ExpenseList>
 
 	{#if data.settlements.length > 0}
 		<Card title="Payments">
@@ -243,12 +258,6 @@
 			{/each}
 		</Card>
 	{/if}
-
-	<div class="shrink-0 px-4 pb-6">
-		<Button class="min-h-12 w-full" onclick={openNewExpense} disabled={group.members.length === 0}>
-			Add expense
-		</Button>
-	</div>
 </div>
 
 <Drawer
@@ -295,37 +304,43 @@
 			/>
 			<FieldError message={form?.field === 'totalMinor' ? form.message : undefined} />
 
-			<div>
-				<label for="expense-payer" class="block text-[13px] font-medium text-subtle">Paid by</label>
-				<select
-					id="expense-payer"
-					name="payerMemberId"
-					bind:value={draftPayerMemberId}
-					class="mt-1 min-h-11 w-full rounded-md border border-chrome px-3 text-[17px] outline-none focus:border-ink"
-				>
-					{#each group.members as member (member.id)}
-						<option value={member.id}>{member.person.name}</option>
-					{/each}
-				</select>
-				<FieldError message={form?.field === 'payerMemberId' ? form.message : undefined} />
-			</div>
+			<!-- Side by side: both are short picks, and the sheet is tall enough already. -->
+			<div class="grid grid-cols-2 gap-3">
+				<div class="min-w-0">
+					<label for="expense-payer" class="block text-[13px] font-medium text-subtle">
+						Paid by
+					</label>
+					<NativeSelect.Root
+						id="expense-payer"
+						name="payerMemberId"
+						bind:value={draftPayerMemberId}
+						class="mt-1"
+					>
+						{#each group.members as member (member.id)}
+							<NativeSelect.Option value={member.id}>{member.person.name}</NativeSelect.Option>
+						{/each}
+					</NativeSelect.Root>
+					<FieldError message={form?.field === 'payerMemberId' ? form.message : undefined} />
+				</div>
 
-			<div>
-				<label for="expense-category" class="block text-[13px] font-medium text-subtle">
-					Category
-				</label>
-				<select
-					id="expense-category"
-					name="categoryId"
-					class="mt-1 min-h-11 w-full rounded-md border border-chrome px-3 text-[17px] outline-none focus:border-ink"
-				>
-					<option value="">None</option>
-					{#each data.categories as category (category.id)}
-						<option value={category.id} selected={selected?.category?.id === category.id}>
-							{category.name}
-						</option>
-					{/each}
-				</select>
+				<div class="min-w-0">
+					<label for="expense-category" class="block text-[13px] font-medium text-subtle">
+						Category
+					</label>
+					<NativeSelect.Root id="expense-category" name="categoryId" class="mt-1">
+						<NativeSelect.Option value="">None</NativeSelect.Option>
+						{#each data.categories as category (category.id)}
+							<!-- Only an edit preselects: `selected` still holds the last expense viewed. -->
+							<NativeSelect.Option
+								value={category.id}
+								selected={editingId !== null && selected?.category?.id === category.id}
+							>
+								{category.name}
+							</NativeSelect.Option>
+						{/each}
+					</NativeSelect.Root>
+					<FieldError message={form?.field === 'categoryId' ? form.message : undefined} />
+				</div>
 			</div>
 
 			<DateField bind:value={draftDate} name="expenseDate" label="Date" />
@@ -512,15 +527,11 @@
 			<label for="member-person" class="block text-[13px] font-medium text-subtle">
 				Add someone
 			</label>
-			<select
-				id="member-person"
-				name="personId"
-				class="mt-1 min-h-11 w-full rounded-md border border-chrome px-3 text-[17px] outline-none focus:border-ink"
-			>
+			<NativeSelect.Root id="member-person" name="personId" class="mt-1">
 				{#each data.candidates as person (person.id)}
-					<option value={person.id}>{person.name}</option>
+					<NativeSelect.Option value={person.id}>{person.name}</NativeSelect.Option>
 				{/each}
-			</select>
+			</NativeSelect.Root>
 		</form>
 	{:else}
 		<p class="pt-4 text-[15px] text-subtle">

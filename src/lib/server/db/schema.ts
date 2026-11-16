@@ -1,4 +1,4 @@
-import { relations, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import {
 	check,
 	foreignKey,
@@ -296,92 +296,14 @@ export const settlements = sqliteTable(
 );
 
 /* ------------------------------------------------------------------ *
- * Relations
- * ------------------------------------------------------------------ */
-
-export const currenciesRelations = relations(currencies, ({ many }) => ({
-	groups: many(groups)
-}));
-
-export const peopleRelations = relations(people, ({ many }) => ({
-	memberships: many(groupMembers)
-}));
-
-export const groupsRelations = relations(groups, ({ one, many }) => ({
-	currency: one(currencies, {
-		fields: [groups.currencyCode],
-		references: [currencies.code]
-	}),
-	members: many(groupMembers),
-	expenses: many(expenses),
-	settlements: many(settlements)
-}));
-
-export const groupMembersRelations = relations(groupMembers, ({ one, many }) => ({
-	group: one(groups, { fields: [groupMembers.groupId], references: [groups.id] }),
-	person: one(people, { fields: [groupMembers.personId], references: [people.id] }),
-	expensesPaid: many(expenses),
-	splits: many(expenseSplits),
-	settlementsSent: many(settlements, { relationName: 'settlementFrom' }),
-	settlementsReceived: many(settlements, { relationName: 'settlementTo' })
-}));
-
-export const categoriesRelations = relations(categories, ({ many }) => ({
-	expenses: many(expenses)
-}));
-
-export const expensesRelations = relations(expenses, ({ one, many }) => ({
-	group: one(groups, { fields: [expenses.groupId], references: [groups.id] }),
-	payer: one(groupMembers, {
-		fields: [expenses.payerMemberId],
-		references: [groupMembers.id]
-	}),
-	category: one(categories, {
-		fields: [expenses.categoryId],
-		references: [categories.id]
-	}),
-	splits: many(expenseSplits)
-}));
-
-export const expenseSplitsRelations = relations(expenseSplits, ({ one }) => ({
-	expense: one(expenses, { fields: [expenseSplits.expenseId], references: [expenses.id] }),
-	member: one(groupMembers, {
-		fields: [expenseSplits.memberId],
-		references: [groupMembers.id]
-	})
-}));
-
-export const settlementsRelations = relations(settlements, ({ one }) => ({
-	group: one(groups, { fields: [settlements.groupId], references: [groups.id] }),
-	from: one(groupMembers, {
-		fields: [settlements.fromMemberId],
-		references: [groupMembers.id],
-		relationName: 'settlementFrom'
-	}),
-	to: one(groupMembers, {
-		fields: [settlements.toMemberId],
-		references: [groupMembers.id],
-		relationName: 'settlementTo'
-	})
-}));
-
-/* ------------------------------------------------------------------ *
  * Inferred types — the source of truth for the whole app
  * ------------------------------------------------------------------ */
 
 export type Currency = typeof currencies.$inferSelect;
-export type NewCurrency = typeof currencies.$inferInsert;
 export type Person = typeof people.$inferSelect;
-export type NewPerson = typeof people.$inferInsert;
 export type Group = typeof groups.$inferSelect;
-export type NewGroup = typeof groups.$inferInsert;
 export type GroupMember = typeof groupMembers.$inferSelect;
-export type NewGroupMember = typeof groupMembers.$inferInsert;
 export type Category = typeof categories.$inferSelect;
-export type NewCategory = typeof categories.$inferInsert;
 export type Expense = typeof expenses.$inferSelect;
-export type NewExpense = typeof expenses.$inferInsert;
 export type ExpenseSplit = typeof expenseSplits.$inferSelect;
-export type NewExpenseSplit = typeof expenseSplits.$inferInsert;
 export type Settlement = typeof settlements.$inferSelect;
-export type NewSettlement = typeof settlements.$inferInsert;

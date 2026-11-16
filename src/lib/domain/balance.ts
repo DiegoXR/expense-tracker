@@ -24,8 +24,9 @@ export type BalanceDelta = {
 };
 
 /**
- * The balance formula, transcribed directly. From Phase 3 the same aggregation runs
- * in SQL; this stays as the reference the query is tested against.
+ * The balance formula, transcribed directly. The group page gets its balances
+ * from the same aggregation in SQL (`getGroupBalances`); this stays as the
+ * reference the tests check the formula against.
  */
 export function computeBalanceDeltas(
 	expenses: ExpenseView[],

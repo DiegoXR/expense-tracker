@@ -3,12 +3,10 @@ import {
 	assertBalancesSumToZero,
 	computeBalanceDeltas,
 	computeMemberLedger,
-	mergeBalances,
-	type MemberBalance
+	mergeBalances
 } from './balance';
-import { simplifyDebts } from './settle';
 import { buildSplits } from './split';
-import { describeBalance, describeExpense, describeTransfer } from './wording';
+import { describeBalance, describeExpense } from './wording';
 import type { CurrencyMeta, ExpenseView, MemberSummary, SettlementView } from './types';
 
 const USD: CurrencyMeta = {
@@ -192,46 +190,6 @@ describe('computeMemberLedger', () => {
 	});
 });
 
-describe('simplifyDebts', () => {
-	const balanceOf = (memberId: string, balanceMinor: number): MemberBalance => ({
-		memberId,
-		person: { id: memberId, name: memberId, avatarColor: null, isSelf: false },
-		balanceMinor
-	});
-
-	it('settles the worked example in one transfer', () => {
-		const transfers = simplifyDebts([balanceOf(alex.id, 4000), balanceOf(sam.id, -4000)]);
-		expect(transfers).toEqual([{ fromMemberId: sam.id, toMemberId: alex.id, amountMinor: 4000 }]);
-	});
-
-	it('clears every balance and needs at most n-1 transfers', () => {
-		const balances = [
-			balanceOf('a', 5000),
-			balanceOf('b', 3000),
-			balanceOf('c', -6000),
-			balanceOf('d', -2000)
-		];
-		const transfers = simplifyDebts(balances);
-		expect(transfers.length).toBeLessThanOrEqual(balances.length - 1);
-
-		const applied = new Map(balances.map((b) => [b.memberId, b.balanceMinor]));
-		for (const t of transfers) {
-			applied.set(t.fromMemberId, applied.get(t.fromMemberId)! + t.amountMinor);
-			applied.set(t.toMemberId, applied.get(t.toMemberId)! - t.amountMinor);
-		}
-		expect([...applied.values()].every((v) => v === 0)).toBe(true);
-	});
-
-	it('suggests nothing when everyone is settled', () => {
-		expect(simplifyDebts([balanceOf('a', 0), balanceOf('b', 0)])).toEqual([]);
-	});
-
-	it('is stable when the input is reordered', () => {
-		const balances = [balanceOf('a', 5000), balanceOf('b', -3000), balanceOf('c', -2000)];
-		expect(simplifyDebts([...balances].reverse())).toEqual(simplifyDebts(balances));
-	});
-});
-
 describe('wording', () => {
 	it('names the payer rather than addressing a viewer', () => {
 		// There is no session, so there is nobody for "you" to mean.
@@ -265,15 +223,5 @@ describe('wording', () => {
 		expect(describeBalance({ memberId: sam.id, person: sam.person, balanceMinor: 0 })).toBe(
 			'Settled up'
 		);
-	});
-
-	it('describes a suggested transfer', () => {
-		expect(
-			describeTransfer(
-				{ fromMemberId: sam.id, toMemberId: alex.id, amountMinor: 4000 },
-				members,
-				USD
-			)
-		).toBe('Sam pays Alex $40.00');
 	});
 });

@@ -4,8 +4,7 @@ import {
 	allocateByPercent,
 	formatMinor,
 	formatMinorPlain,
-	parseMinor,
-	parsePercent
+	parseMinor
 } from './money';
 import type { CurrencyMeta } from './types';
 
@@ -139,24 +138,5 @@ describe('formatMinorPlain', () => {
 	it('pads amounts below one major unit', () => {
 		expect(formatMinorPlain(5, 2)).toBe('0.05');
 		expect(formatMinorPlain(50, 2)).toBe('0.50');
-	});
-});
-
-describe('parsePercent', () => {
-	it('accepts whole numbers, with or without the sign', () => {
-		expect(parsePercent('60')).toBe(60);
-		expect(parsePercent('60%')).toBe(60);
-		expect(parsePercent('0')).toBe(0);
-		expect(parsePercent('100')).toBe(PERCENT_TOTAL);
-	});
-
-	it('rejects fractional percentages in every currency', () => {
-		expect(() => parsePercent('50.1')).toThrow(/whole number/);
-		expect(() => parsePercent('33,33')).toThrow(/whole number/);
-	});
-
-	it('rejects impossible or empty shares', () => {
-		expect(() => parsePercent('101')).toThrow(/cannot exceed 100%/);
-		expect(() => parsePercent('')).toThrow(/Enter a percentage/);
 	});
 });

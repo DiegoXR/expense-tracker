@@ -24,10 +24,6 @@ export async function createPerson(
 	await db.insert(people).values({ name: input.name, avatarColor: input.avatarColor });
 }
 
-export async function renamePerson(db: Database, personId: string, name: string): Promise<void> {
-	await db.update(people).set({ name }).where(eq(people.id, personId));
-}
-
 /**
  * Marks one person as the ledger keeper, clearing whoever held it.
  *
