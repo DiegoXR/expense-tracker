@@ -126,16 +126,3 @@ export function mergeBalances(members: MemberSummary[], deltas: BalanceDelta[]):
 		balanceMinor: byMemberId.get(member.id) ?? 0
 	}));
 }
-
-/**
- * Balances must sum to zero; anything else is data corruption and otherwise silent.
- * Called from load functions in dev only — a bug detector, not validation.
- */
-export function assertBalancesSumToZero(balances: MemberBalance[]): void {
-	const total = balances.reduce((sum, balance) => sum + balance.balanceMinor, 0);
-	if (total !== 0) {
-		throw new Error(
-			`Balance invariant violated: balances sum to ${total} minor units instead of 0.`
-		);
-	}
-}

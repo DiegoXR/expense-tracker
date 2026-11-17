@@ -2,7 +2,7 @@ import { fail, type Actions } from '@sveltejs/kit';
 import { archiveCategory, createCategory, listCategories } from '$lib/server/queries/categories';
 import { listCurrencies } from '$lib/server/queries/currencies';
 import { listGroupsWithTotals, createGroup } from '$lib/server/queries/groups';
-import { archivePerson, createPerson, listPeople, setSelf } from '$lib/server/queries/people';
+import { archivePerson, createPerson, listPeople } from '$lib/server/queries/people';
 import type { PageServerLoad } from './$types';
 
 /** Trimmed text, or null when the field was blank. */
@@ -66,15 +66,6 @@ export const actions: Actions = {
 		}
 
 		await createPerson(locals.db, { name, avatarColor: text(data, 'avatarColor') });
-		return { success: true };
-	},
-
-	setSelf: async ({ request, locals }) => {
-		const data = await request.formData();
-		const personId = text(data, 'personId');
-		if (!personId) return fail(400, { message: 'No person given.' });
-
-		await setSelf(locals.db, personId);
 		return { success: true };
 	},
 

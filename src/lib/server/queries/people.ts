@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, ne } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 import type { Database } from '$lib/server/db';
 import { people } from '$lib/server/db/schema';
 import type { PersonSummary } from '$lib/domain/types';
@@ -22,20 +22,6 @@ export async function createPerson(
 	input: { name: string; avatarColor: string | null }
 ): Promise<void> {
 	await db.insert(people).values({ name: input.name, avatarColor: input.avatarColor });
-}
-
-/**
- * Marks one person as the ledger keeper, clearing whoever held it.
- *
- * A partial unique index allows only one row with `is_self = 1`, so the clear
- * has to land first — hence a batch rather than two awaits, which D1 could
- * interleave with another request and leave two selves for an instant.
- */
-export async function setSelf(db: Database, personId: string): Promise<void> {
-	await db.batch([
-		db.update(people).set({ isSelf: false }).where(ne(people.id, personId)),
-		db.update(people).set({ isSelf: true }).where(eq(people.id, personId))
-	]);
 }
 
 /** Soft delete: memberships and history keep pointing at the row. */

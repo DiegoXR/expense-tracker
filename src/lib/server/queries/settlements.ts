@@ -18,20 +18,6 @@ export function listSettlements(db: Database, groupId: string): Promise<Settleme
 		.orderBy(desc(settlements.settledDate), asc(settlements.id));
 }
 
-export async function createSettlement(
-	db: Database,
-	input: {
-		groupId: string;
-		fromMemberId: string;
-		toMemberId: string;
-		amountMinor: number;
-		settledDate: string;
-		note: string | null;
-	}
-): Promise<void> {
-	await db.insert(settlements).values(input);
-}
-
 export async function deleteSettlement(
 	db: Database,
 	groupId: string,

@@ -1,63 +1,51 @@
 # Expense Tracker
 
-A small, self-hosted app for splitting shared expenses — between a couple, roommates, or a group of friends on a trip.
+A small, self-hosted app for splitting shared expenses between a couple, roommates, or a group of friends on a trip.
 
-It started as a replacement for the parts of Splitwise that actually matter day to day: log who paid, decide how it splits, and see at a glance who owes whom. No ads, no expense limits, no account on someone else's server — you deploy it to your own Cloudflare account and the data lives in your own database.
+We used to use the subscription ofSplitwise but then we decided to build our own solution and self-host it. If does not fully replace Splitwise but it containes the main funcions that actually matter day to day: log who paid, decide how it splits, and see at a glance who owes whom. No expense limits, no account on someone else's server — you deploy it to your own Cloudflare account and the data lives in your own database.
 
 It is designed **mobile-first**: the main use is pulling out your phone right after paying for something.
 
-> **Status:** early and actively developed. The core flow works; expect rough edges.
+> **Status:** early and actively developed.
 
 ## Features
 
 - **Groups** with their own currency and members (e.g. "Home", "Trip to Cartagena").
 - **Expenses** with a payer, a category, a date and a percentage split per member. Amounts are stored as integers in the currency's minor unit, so there are no floating-point rounding errors and splits always add up to the exact total.
 - **Balances** per member, so everyone can see who owes and who is owed.
-- **Settlements** to record payments between members.
 - **Categories** shared across groups (groceries, rent, dining out, …).
 - **Multiple currencies**, including ones with no minor unit such as COP, KRW, VND or IDR.
 
 ## Stack
 
-| Layer      | Technology                                                                                            |
-| ---------- | ----------------------------------------------------------------------------------------------------- |
-| Framework  | [SvelteKit](https://svelte.dev/docs/kit) + [Svelte 5](https://svelte.dev) + TypeScript                |
-| UI         | [Tailwind CSS 4](https://tailwindcss.com), [shadcn-svelte](https://shadcn-svelte.com), Lucide icons   |
-| Hosting    | [Cloudflare Workers](https://developers.cloudflare.com/workers/) via `@sveltejs/adapter-cloudflare`   |
-| Database   | [Cloudflare D1](https://developers.cloudflare.com/d1/) (SQLite)                                       |
-| ORM        | [Drizzle ORM](https://orm.drizzle.team) + drizzle-kit for migrations                                  |
-| Tooling    | pnpm, Vite, Vitest, ESLint, Prettier, Wrangler                                                        |
+| Layer     | Technology                                                                                          |
+| --------- | --------------------------------------------------------------------------------------------------- |
+| Framework | [SvelteKit](https://svelte.dev/docs/kit) + [Svelte 5](https://svelte.dev) + TypeScript              |
+| UI        | [Tailwind CSS 4](https://tailwindcss.com), [shadcn-svelte](https://shadcn-svelte.com), Lucide icons |
+| Hosting   | [Cloudflare Workers](https://developers.cloudflare.com/workers/) via `@sveltejs/adapter-cloudflare` |
+| Database  | [Cloudflare D1](https://developers.cloudflare.com/d1/) (SQLite)                                     |
+| ORM       | [Drizzle ORM](https://orm.drizzle.team) + drizzle-kit for migrations                                |
+| Tooling   | pnpm, Vite, Vitest, ESLint, Prettier, Wrangler                                                      |
 
 ## Requirements
 
 - **Node.js 24** or newer
 - **pnpm 11** (`corepack enable` will pick up the version pinned in `package.json`)
-- A free **[Cloudflare account](https://dash.cloudflare.com/sign-up)** — only needed to deploy. Local development runs entirely on your machine.
+- A free **[Cloudflare account](https://dash.cloudflare.com/sign-up)** — needed from the start, because the dev server uses your real D1 database (see below).
 
 The free tiers of Workers and D1 are more than enough for personal use.
 
-## Getting started (local)
+## Getting started
 
-Local development uses a local D1 database simulated by Wrangler, so you don't need a Cloudflare account for this part.
+Each person who uses this app gets **their own Worker and their own D1 database** — nothing is shared with anyone else.
+
+> **`pnpm dev` reads and writes your real database.** The D1 binding in [`wrangler.jsonc`](wrangler.jsonc) is marked `"remote": true`, so local development and the deployed app share one ledger instead of drifting apart. Anything you create, edit or delete while developing is real. If you would rather develop against a throwaway local copy, remove `"remote": true` and use the `db:*:local` scripts instead.
 
 ```sh
 git clone <this-repo-url>
 cd expense-tracker
 pnpm install
-
-# Create the tables and load the default currencies and categories
-pnpm db:migrate:local
-pnpm db:seed:local
-
-# Start the dev server
-pnpm dev
 ```
-
-Open the URL Vite prints (usually http://localhost:5173). To test on your phone, run `pnpm dev --host` and open the network URL from a device on the same Wi-Fi.
-
-## Deploying to your own Cloudflare account
-
-Each person who deploys this app gets **their own Worker and their own D1 database** — nothing is shared with anyone else.
 
 1. **Log in to Cloudflare from the CLI**
 
@@ -81,28 +69,39 @@ Each person who deploys this app gets **their own Worker and their own D1 databa
        "binding": "DB",
        "database_name": "expense-tracker",
        "database_id": "<your-database-id>",
-       "migrations_dir": "drizzle"
+       "migrations_dir": "drizzle",
+       "remote": true
      }
    ]
    ```
 
    The `database_id` is not a secret — it is only an identifier. Access to the database still requires your Cloudflare credentials. If you choose a database name other than `expense-tracker`, update the `db:*` scripts in `package.json` too.
 
-4. **Create the tables and seed data in the remote database**
+4. **Create the tables and load the default currencies and categories**
 
    ```sh
    pnpm db:migrate:remote
    pnpm db:seed:remote
    ```
 
-5. **Build and deploy**
+5. **Start the dev server**
 
    ```sh
-   pnpm build
-   pnpm wrangler deploy
+   pnpm dev
    ```
 
-   Your app is now live at `https://expense-tracker.<your-subdomain>.workers.dev`.
+   Open the URL Vite prints (usually http://localhost:5173). To test on your phone, run `pnpm dev --host` and open the network URL from a device on the same Wi-Fi.
+
+## Deploying
+
+```sh
+pnpm build
+pnpm wrangler deploy
+```
+
+Your app is now live at `https://expense-tracker.<your-subdomain>.workers.dev`.
+
+To deploy on every push instead, connect the repository under **Workers & Pages → expense-tracker → Settings → Builds** (build command `pnpm run build`, deploy command `npx wrangler deploy`). Builds do not run database migrations: apply them yourself with `pnpm db:migrate:remote`.
 
 ### ⚠️ Protect your deployment
 
@@ -115,11 +114,13 @@ Each person who deploys this app gets **their own Worker and their own D1 databa
 
 If you add a custom domain later, it needs its own Access application.
 
+Once Access is on, `pnpm dev` needs to get through it too, because Wrangler reaches your remote database through a preview on that `workers.dev` domain. Install [`cloudflared`](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/) and Wrangler will open the Access login in your browser the first time you start the dev server.
+
 ## Scripts
 
 | Command                  | What it does                                               |
 | ------------------------ | ---------------------------------------------------------- |
-| `pnpm dev`               | Start the dev server with a local D1 database              |
+| `pnpm dev`               | Start the dev server against your Cloudflare D1 database   |
 | `pnpm build`             | Generate Worker types and build for Cloudflare             |
 | `pnpm preview`           | Run the production build locally with Wrangler             |
 | `pnpm check`             | Type-check the project                                     |
@@ -127,10 +128,10 @@ If you add a custom domain later, it needs its own Access application.
 | `pnpm lint` / `format`   | Check / fix formatting and lint rules                      |
 | `pnpm gen`               | Regenerate Worker binding types (`wrangler types`)         |
 | `pnpm db:generate`       | Generate a new SQL migration after editing the schema      |
-| `pnpm db:migrate:local`  | Apply migrations to the local database                     |
 | `pnpm db:migrate:remote` | Apply migrations to your Cloudflare D1 database            |
-| `pnpm db:seed:local`     | Load default currencies and categories locally             |
 | `pnpm db:seed:remote`    | Load default currencies and categories in Cloudflare       |
+| `pnpm db:migrate:local`  | Same, for a local database (only without `"remote": true`) |
+| `pnpm db:seed:local`     | Same, for a local database (only without `"remote": true`) |
 
 Seeds are safe to re-run: they use `INSERT OR IGNORE`.
 
@@ -138,7 +139,7 @@ Seeds are safe to re-run: they use `INSERT OR IGNORE`.
 
 1. Edit [`src/lib/server/db/schema.ts`](src/lib/server/db/schema.ts).
 2. Run `pnpm db:generate` to create a new migration in [`drizzle/`](drizzle/).
-3. Apply it with `pnpm db:migrate:local`, and with `pnpm db:migrate:remote` when you deploy.
+3. Apply it with `pnpm db:migrate:remote`. Development and the deployed app share that database, so apply it before pushing code that depends on the new schema.
 
 ## Project structure
 

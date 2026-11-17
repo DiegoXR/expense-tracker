@@ -61,9 +61,9 @@ export function describeExpense(
 	return { title, detail: `${joinClauses(clauses)}.` };
 }
 
-export type BalanceStatus = 'owed' | 'owes' | 'settled';
+type BalanceStatus = 'owed' | 'owes' | 'settled';
 
-export function balanceStatus(balanceMinor: number): BalanceStatus {
+function balanceStatus(balanceMinor: number): BalanceStatus {
 	if (balanceMinor > 0) return 'owed';
 	if (balanceMinor < 0) return 'owes';
 	return 'settled';

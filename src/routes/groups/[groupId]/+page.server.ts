@@ -15,11 +15,7 @@ import {
 import { archiveGroup, deleteGroup, getGroup, updateGroup } from '$lib/server/queries/groups';
 import { addMember, removeMember } from '$lib/server/queries/members';
 import { listPeople } from '$lib/server/queries/people';
-import {
-	createSettlement,
-	deleteSettlement,
-	listSettlements
-} from '$lib/server/queries/settlements';
+import { deleteSettlement, listSettlements } from '$lib/server/queries/settlements';
 import type { PageServerLoad } from './$types';
 
 /**
@@ -225,43 +221,6 @@ export const actions: Actions = {
 		if (!expenseId) return fail(400, { message: 'No expense given.' });
 
 		await deleteExpense(locals.db, groupId, expenseId);
-		return { success: true };
-	},
-
-	recordSettlement: async ({ params, request, locals }) => {
-		const groupId = requireGroupId(params);
-		const group = await loadGroup(locals.db, groupId);
-		const data = await request.formData();
-
-		const fromMemberId = text(data, 'fromMemberId');
-		const toMemberId = text(data, 'toMemberId');
-		const isMember = (id: string | null) =>
-			id !== null && group.members.some((member) => member.id === id);
-
-		if (!isMember(fromMemberId) || !isMember(toMemberId)) {
-			return fail(400, { field: 'fromMemberId', message: 'Both sides must be members.' });
-		}
-		if (fromMemberId === toMemberId) {
-			return fail(400, { field: 'toMemberId', message: 'Pick two different members.' });
-		}
-
-		const amountMinor = positiveInt(data, 'amountMinor');
-		if (!amountMinor) return fail(400, { field: 'amountMinor', message: 'Enter an amount.' });
-
-		const settledDate = text(data, 'settledDate');
-		if (!settledDate || !ISO_DATE.test(settledDate)) {
-			return fail(400, { field: 'settledDate', message: 'Pick a date.' });
-		}
-
-		await createSettlement(locals.db, {
-			groupId,
-			fromMemberId: fromMemberId!,
-			toMemberId: toMemberId!,
-			amountMinor,
-			settledDate,
-			note: text(data, 'note')
-		});
-
 		return { success: true };
 	},
 

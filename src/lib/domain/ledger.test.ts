@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-	assertBalancesSumToZero,
-	computeBalanceDeltas,
-	computeMemberLedger,
-	mergeBalances
-} from './balance';
+import { computeBalanceDeltas, computeMemberLedger, mergeBalances } from './balance';
 import { buildSplits } from './split';
 import { describeBalance, describeExpense } from './wording';
 import type { CurrencyMeta, ExpenseView, MemberSummary, SettlementView } from './types';
@@ -148,7 +143,7 @@ describe('balances', () => {
 		expect(apartment.splits.reduce((sum, split) => sum + split.shareMinor, 0)).toBe(1_250_000);
 
 		const balances = mergeBalances(trio, computeBalanceDeltas([apartment], [payment]));
-		expect(() => assertBalancesSumToZero(balances)).not.toThrow();
+		expect(balances.reduce((sum, balance) => sum + balance.balanceMinor, 0)).toBe(0);
 	});
 });
 
